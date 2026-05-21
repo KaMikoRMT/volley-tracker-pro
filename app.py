@@ -322,7 +322,7 @@ def _fig_setter_heatmap(heatmap: dict) -> pgo.Figure:
         showscale=False, zmin=0, zmax=max_val,
     ))
     fig.update_layout(
-        **_PLOTLY_LAYOUT,
+        **{k: v for k, v in _PLOTLY_LAYOUT.items() if k != "margin"},
         height=230,
         margin=dict(l=70, r=10, t=40, b=60),
         xaxis=dict(side="top", gridcolor="#252b3b", color="#7a849e"),
