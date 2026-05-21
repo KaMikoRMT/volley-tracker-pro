@@ -307,6 +307,38 @@ def _fig_donut(groups: dict, total: int) -> pgo.Figure:
     return fig
 
 
+def _fig_score_bar(groups: dict) -> pgo.Figure | None:
+    """攻擊各策略評分水平長條圖。"""
+    ctx_def = [("一般攻擊", "#4a9eff"), ("吊球", "#f5a623"), ("處理球", "#3ecf6a")]
+    labels, scores, colors = [], [], []
+    for ctx, col in ctx_def:
+        arr = groups.get(ctx, [])
+        if arr:
+            labels.append(ctx)
+            scores.append(gl.safe_avg([l["scoreDelta"] for l in arr]))
+            colors.append(col)
+    if not labels:
+        return None
+    fig = pgo.Figure(pgo.Bar(
+        y=labels, x=scores, orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+        text=[f"{s:+.0f}" for s in scores],
+        textposition="outside", textfont=dict(color="#e8eaf2", size=13),
+    ))
+    fig.update_layout(
+        **{k: v for k, v in _PLOTLY_LAYOUT.items() if k != "margin"},
+        height=160,
+        margin=dict(l=10, r=55, t=20, b=10),
+        xaxis=dict(
+            range=[-100, 100], gridcolor="#252b3b", color="#7a849e",
+            zeroline=True, zerolinecolor="#505a6e", showticklabels=False,
+        ),
+        yaxis=dict(gridcolor="rgba(0,0,0,0)", color="#e8eaf2"),
+        showlegend=False,
+    )
+    return fig
+
+
 def _fig_setter_heatmap(heatmap: dict) -> pgo.Figure:
     """舉球品質熱力圖。行=舉球品質，列=一傳品質。"""
     Q = gl.Q_KEYS
@@ -574,6 +606,29 @@ def page_setup():
 def page_record():
     ss = st.session_state
 
+    # ── 全域按鈕樣式注入 ──────────────────────────────────────────────────────
+    st.markdown("""
+<style>
+div[data-testid="stButton"] button {
+    min-height: 54px !important;
+    border-radius: 10px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.2px;
+}
+div[data-testid="stButton"] button[kind="secondary"] {
+    background: #1a1f30 !important;
+    border: 1.5px solid #3a4560 !important;
+    color: #c8d2e8 !important;
+}
+div[data-testid="stButton"] button[kind="secondary"]:hover {
+    border-color: #f5a623 !important;
+    color: #f5a623 !important;
+    background: #211e12 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
     # ── 頂部資訊列 ────────────────────────────────────────────────────────────
     hcol1, hcol2, hcol3 = st.columns([3, 2, 1])
     with hcol1:
@@ -635,10 +690,26 @@ def page_record():
     last_divider = next((l for l in ss.logs if l["type"] == "divider" and l.get("setNo", 1) == ss.current_set), None)
     last_winner = last_divider["winner"] if last_divider else None
 
-    sc1, sc2, sc3 = st.columns(3)
-    sc1.metric("前置動作", prev_label)
-    sc2.metric("發球狀態", "✅ 已發球" if used_serve else "— 未發球")
-    sc3.metric("接發狀態", "✅ 已接發" if used_receive else "— 未接發")
+    _s_col = "#3ecf6a"
+    _g_col = "#3a4560"
+    st.markdown(
+        f"<div style='display:flex;gap:10px;margin:6px 0 10px;flex-wrap:wrap;'>"
+        f"<div style='background:#141720;border:1.5px solid #f5a623;border-radius:8px;"
+        f"padding:5px 16px;font-size:13px;'>"
+        f"<span style='color:#7a849e;'>前置　</span><b style='color:#f5a623;'>{prev_label}</b></div>"
+        f"<div style='background:#141720;border:1.5px solid {'#3ecf6a' if used_serve else _g_col};"
+        f"border-radius:8px;padding:5px 16px;font-size:13px;'>"
+        f"<span style='color:#7a849e;'>發球　</span>"
+        f"<b style='color:{'#3ecf6a' if used_serve else '#7a849e'};'>"
+        f"{'✅ 已發球' if used_serve else '未發球'}</b></div>"
+        f"<div style='background:#141720;border:1.5px solid {'#3ecf6a' if used_receive else _g_col};"
+        f"border-radius:8px;padding:5px 16px;font-size:13px;'>"
+        f"<span style='color:#7a849e;'>接發　</span>"
+        f"<b style='color:{'#3ecf6a' if used_receive else '#7a849e'};'>"
+        f"{'✅ 已接發' if used_receive else '未接發'}</b></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
     # ── 得分結束按鈕 ──────────────────────────────────────────────────────────
     st.markdown("**📌 本分結果**")
@@ -670,7 +741,7 @@ def page_record():
 
     st.markdown("**⚡ 建議動作**")
     if quick_opts:
-        n_cols = min(len(quick_opts), 5)
+        n_cols = min(len(quick_opts), 4)
         opt_cols = st.columns(n_cols)
         for i, opt in enumerate(quick_opts):
             with opt_cols[i % n_cols]:
@@ -932,20 +1003,19 @@ def page_analysis():
                         st.markdown(f"**{p['name']}** <span style='color:#7a849e;font-size:12px;'>({p['pos']}) {len(arr)} 次</span>",
                                     unsafe_allow_html=True)
                         if arr:
-                            st.plotly_chart(_fig_donut(groups, len(arr)),
-                                            use_container_width=True, config={"displayModeBar": False})
-                            for ctx, col in [("一般攻擊", "#4a9eff"), ("吊球", "#f5a623"), ("處理球", "#3ecf6a")]:
-                                ctx_arr = groups.get(ctx, [])
-                                pct = round(len(ctx_arr) / len(arr) * 100) if arr else 0
-                                sc  = gl.safe_avg([l["scoreDelta"] for l in ctx_arr])
-                                st.markdown(
-                                    f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
-                                    f"<span><span style='background:{col};border-radius:50%;display:inline-block;"
-                                    f"width:8px;height:8px;margin-right:5px;'></span>{ctx}</span>"
-                                    f"<span>{pct}% · <b style='color:{gl.score_color_hex(sc)};'>{sc if ctx_arr else '—'}</b></span>"
-                                    f"</div>",
-                                    unsafe_allow_html=True,
-                                )
+                            pie_col, bar_col = st.columns([1, 1])
+                            with pie_col:
+                                st.caption("策略頻率")
+                                st.plotly_chart(_fig_donut(groups, len(arr)),
+                                                use_container_width=True, config={"displayModeBar": False})
+                            with bar_col:
+                                st.caption("各策略評分")
+                                fig_bar = _fig_score_bar(groups)
+                                if fig_bar:
+                                    st.plotly_chart(fig_bar, use_container_width=True,
+                                                    config={"displayModeBar": False})
+                                else:
+                                    st.caption("無評分數據")
                         else:
                             st.caption("無攻擊數據")
         else:
