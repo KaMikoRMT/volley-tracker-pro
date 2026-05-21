@@ -76,23 +76,6 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
     font-size: 13px !important; padding: 0 14px !important;
 }
 
-/* ── Quality buttons per column (5-col layout) ── */
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) button[kind="secondary"] {
-    color: #3ecf6a !important; border-color: #3ecf6a55 !important; background: #0b1a10 !important;
-}
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) button[kind="secondary"] {
-    color: #4a9eff !important; border-color: #4a9eff55 !important; background: #0b1320 !important;
-}
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) button[kind="secondary"] {
-    color: #c8d2e8 !important; border-color: #2e3854 !important;
-}
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) button[kind="secondary"] {
-    color: #f5a623 !important; border-color: #f5a62355 !important; background: #1c1408 !important;
-}
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) button[kind="secondary"] {
-    color: #e84343 !important; border-color: #e8434355 !important; background: #1c0808 !important;
-}
-
 /* ── Containers / cards ── */
 [data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 14px !important; border-color: #252d42 !important;
@@ -696,14 +679,12 @@ def _tab_record():
     ss = st.session_state
 
     with st.container(border=True):
-        # 標題列
         th1, th2, th3 = st.columns([4, 1, 1])
         with th1:
             st.markdown(
                 "<span style='font-size:16px;font-weight:800;'>⚡ 智慧快記</span>"
-                "<span style='color:#7a849e;font-size:11px;margin-left:10px;'>"
-                "依照前置動作、位置與本分狀態自動縮小選項。現在是第 "
-                f"{ss.current_set} 局。</span>",
+                f"<span style='color:#7a849e;font-size:11px;margin-left:10px;'>"
+                f"依照前置動作、位置與本分狀態自動縮小選項。現在是第 {ss.current_set} 局。</span>",
                 unsafe_allow_html=True,
             )
         with th2:
@@ -716,7 +697,6 @@ def _tab_record():
                 ss.selected_action = None; ss.selected_context = None
                 st.rerun()
 
-        # 球員選擇 + 狀態資訊（同一行）
         sel_player = next((p for p in ss.players if p["id"] == ss.selected_player_id), None)
         prev = ss.prev_action_state
         prev_label = (f"{prev.get('context') or prev.get('action')} ({prev.get('quality')})"
@@ -742,10 +722,8 @@ def _tab_record():
                     ss.selected_action = None; ss.selected_context = None
                     st.rerun()
 
-        # 緊湊狀態列
-        s_c = "#3ecf6a"; g_c = "#2e3854"
         st.markdown(
-            f"<div style='display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 4px;"
+            f"<div style='display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px;"
             f"font-size:12px;color:#7a849e;align-items:center;'>"
             f"目前球員：<b style='color:#f5a623;'>{sel_player['name'] if sel_player else '—'}</b>"
             f"　前置：<b style='color:#e8eaf2;'>{prev_label}</b>"
@@ -758,21 +736,19 @@ def _tab_record():
             unsafe_allow_html=True,
         )
 
-    # ── 建議動作（大卡片）─────────────────────────────────────────────────────
+    # ── 建議動作（單橫列，精簡標籤）──────────────────────────────────────────
     quick_opts = gl.suggest_quick_options(
         ss.prev_action_state, sel_player, used_serve, used_receive, last_winner,
     )
 
     if quick_opts:
-        n_cols = min(len(quick_opts), 4)
-        opt_cols = st.columns(n_cols)
+        opt_cols = st.columns(len(quick_opts))
         for i, opt in enumerate(quick_opts):
-            with opt_cols[i % n_cols]:
+            with opt_cols[i]:
                 is_active = (ss.selected_action == opt["a"] and ss.selected_context == opt["c"])
-                ctx_label = opt["c"] if opt["c"] and opt["c"] != "一般" else "一般"
-                btn_label = f"**{opt['label']}**\n{opt['why']}\n{ctx_label}"
                 if st.button(
-                    btn_label, key=f"opt_{i}_{opt['a']}_{opt['c']}",
+                    opt["label"],
+                    key=f"opt_{i}_{opt['a']}_{opt['c']}",
                     type="primary" if is_active else "secondary",
                     use_container_width=True,
                 ):
@@ -782,83 +758,116 @@ def _tab_record():
 
     with st.expander("📋 完整動作面板（進階）"):
         act_cols = st.columns(len(gl.ACTION_MAP))
-        for i, (act, ainfo) in enumerate(gl.ACTION_MAP.items()):
+        for i, (act, _) in enumerate(gl.ACTION_MAP.items()):
             with act_cols[i]:
                 if st.button(act, key=f"fullact_{act}", use_container_width=True):
                     ss.selected_action = act
                     ss.selected_context = gl.default_context(act)
                     st.rerun()
-        if ss.selected_action:
-            ctx_list = gl.ACTION_MAP.get(ss.selected_action, {}).get("contexts") or ["一般"]
-            if len(ctx_list) > 1:
-                st.markdown(f"**{ss.selected_action} 細項：**")
-                ctx_cols = st.columns(len(ctx_list))
-                for i, c in enumerate(ctx_list):
-                    with ctx_cols[i]:
-                        is_active = ss.selected_context == c
-                        if st.button(c, key=f"ctx_{c}", use_container_width=True,
-                                     type="primary" if is_active else "secondary"):
-                            ss.selected_context = c; st.rerun()
 
-    # ── 細項選擇 ─────────────────────────────────────────────────────────────
-    if ss.selected_action:
-        ctx_list = gl.ACTION_MAP.get(ss.selected_action, {}).get("contexts") or ["一般"]
-        if len(ctx_list) > 1 and not st.session_state.get("fullact_expanded"):
-            st.markdown("**選擇細項**")
-            chip_cols = st.columns(len(ctx_list))
-            for i, c in enumerate(ctx_list):
-                with chip_cols[i]:
-                    is_active = ss.selected_context == c
-                    if st.button(
-                        c, key=f"chip_{c}", use_container_width=True,
-                        type="primary" if is_active else "secondary",
-                    ):
-                        ss.selected_context = c; st.rerun()
-
-    # ── 品質按鈕 ─────────────────────────────────────────────────────────────
+    # ── 品質按鈕（有選擇動作時才顯示）────────────────────────────────────────
     if ss.selected_action:
         ctx_display = ss.selected_context or gl.default_context(ss.selected_action)
-        st.markdown(f"**品質**　<span style='color:#7a849e;font-size:12px;'>"
-                    f"動作：{ss.selected_action} — {ctx_display}</span>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='margin:10px 0 4px;font-size:12px;color:#7a849e;'>"
+            f"品質　<b style='color:#e8eaf2;'>{ss.selected_action} — {ctx_display}</b></div>",
+            unsafe_allow_html=True,
+        )
+        _Q_COLORS = ["#3ecf6a", "#4a9eff", "#c8d2e8", "#f5a623", "#e84343"]
+        _Q_BKGS   = ["#0b1a10", "#0b1320", "#141820", "#1c1408", "#1c0808"]
         q_cols = st.columns(5)
         for i, q in enumerate(gl.Q_KEYS):
             with q_cols[i]:
+                col = _Q_COLORS[i]; bkg = _Q_BKGS[i]
+                # 彩色視覺標頭
+                st.markdown(
+                    f"<div style='background:{bkg};border:1.5px solid {col}55;"
+                    f"border-bottom:none;border-radius:10px 10px 0 0;"
+                    f"padding:10px 4px 6px;text-align:center;'>"
+                    f"<div style='font-size:26px;font-weight:900;color:{col};line-height:1;'>{q}</div>"
+                    f"<div style='font-size:11px;color:#8090a8;margin-top:3px;'>{gl.QUALITY_LABELS[q]}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+                # 實際點擊按鈕（接在卡片正下方）
+                st.markdown(
+                    f"<style>div[data-testid='stButton']:has(button[data-testid='baseButton-secondary']"
+                    f"[kind='secondary']) + div {{ margin-top:-2px; }}</style>",
+                    unsafe_allow_html=True,
+                )
                 if st.button(
-                    f"{q}\n{gl.QUALITY_LABELS[q]}",
-                    key=f"quality_{q}",
-                    use_container_width=True,
+                    "　", key=f"quality_{q}", use_container_width=True,
                 ):
                     add_log(q); st.rerun()
 
     # ── 本分結果 ─────────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown(
-        "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'>",
-        unsafe_allow_html=True,
-    )
-    res_cols = st.columns(4)
-    _result_btns = [
-        ("✓ 我方得分", "win", "最後觸球加成", "#1a3a1a", "#3ecf6a"),
-        ("＋ 對方失誤", "oppError", "不加成球員", "#1a2a1a", "#3ecf6a"),
-        ("✗ 我方失分", "lose", "最後觸球扣分", "#3a0e0e", "#e84343"),
-        ("○ 對手好球", "opponent", "不扣分", "#2a1e0a", "#f5a623"),
+    st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+    _RESULT_CFG = [
+        ("✓ 我方得分", "win",      "最後觸球加成", "#1a3a1a", "#3ecf6a"),
+        ("＋ 對方失誤", "oppError", "不加成球員",  "#0e1e14", "#4dbb79"),
+        ("✗ 我方失分", "lose",     "最後觸球扣分", "#2e0e0e", "#e84343"),
+        ("○ 對手好球", "opponent", "不扣分",       "#1e1608", "#f5a623"),
     ]
-    for col, (label, ptype, sub, bg, border) in zip(res_cols, _result_btns):
+    res_cols = st.columns(4)
+    for col, (label, ptype, sub, bg, border) in zip(res_cols, _RESULT_CFG):
         with col:
+            # 彩色卡片標頭（無負 margin，乾淨疊加）
             st.markdown(
                 f"<div style='background:{bg};border:2px solid {border};"
-                f"border-radius:10px;padding:10px 8px 6px;text-align:center;"
-                f"margin-bottom:-52px;pointer-events:none;'>"
-                f"<div style='font-size:14px;font-weight:800;color:{border};'>{label}</div>"
-                f"<div style='font-size:11px;color:#7a849e;margin-top:2px;'>{sub}</div>"
+                f"border-bottom:none;border-radius:10px 10px 0 0;"
+                f"padding:8px 6px 5px;text-align:center;'>"
+                f"<div style='font-size:13px;font-weight:800;color:{border};'>{label}</div>"
+                f"<div style='font-size:10px;color:#7a849e;margin-top:2px;'>{sub}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
-            if st.button("　", key=f"res_{ptype}", use_container_width=True):
+            if st.button("▲", key=f"res_{ptype}", use_container_width=True):
                 resolve_point(ptype); st.rerun()
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # ── 本局紀錄（快記下方）──────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
+    cur_logs = [l for l in ss.logs if l.get("setNo", 1) == ss.current_set]
+    if cur_logs:
+        st.markdown(
+            "<div style='font-size:12px;color:#7a849e;margin-bottom:4px;'>📜 本局紀錄</div>",
+            unsafe_allow_html=True,
+        )
+        def score_badge(v):
+            color = gl.score_color_hex(v)
+            return f"<span style='color:{color};font-weight:bold;'>{v:+}</span>"
+        with st.container(border=True):
+            for l in cur_logs:
+                if l["type"] == "divider":
+                    winner_color = "#3ecf6a" if l["winner"] == "us" else "#e84343"
+                    st.markdown(
+                        f"<div style='text-align:center;padding:5px 0;"
+                        f"border-top:1px dashed #252b3b;'>"
+                        f"<span style='background:{winner_color};color:#000;padding:2px 10px;"
+                        f"border-radius:10px;font-size:11px;font-weight:bold;'>"
+                        f"第{l.get('setNo',1)}局 ｜ {l['result']}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    p_name = next((p["name"] for p in ss.players
+                                   if p["id"] == l["playerId"]), "未知")
+                    ctx = l.get("context", "一般")
+                    display = ctx if ctx != "一般" else l["action"]
+                    note = (f" <small style='color:#7a849e;'>{l['note']}</small>"
+                            if l.get("note") else "")
+                    st.markdown(
+                        f"<div style='display:flex;justify-content:space-between;"
+                        f"padding:5px 0;border-bottom:1px solid #1b1f2e;font-size:13px;'>"
+                        f"<span><b>{p_name}</b>：{display} ({l['quality']}) {note}</span>"
+                        f"{score_badge(round(l['scoreDelta']))}"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+    else:
+        st.markdown(
+            "<div style='text-align:center;color:#3a4560;font-size:13px;"
+            "padding:20px 0;'>本局尚無紀錄</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def _tab_log():
@@ -1221,13 +1230,12 @@ def page_record():
     st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
 
     # 主 Tab 區
-    tabs = st.tabs(["名單", "智慧快記", "完整紀錄", "評分", "詳情", "視覺分析"])
+    tabs = st.tabs(["名單", "智慧快記", "評分", "詳情", "視覺分析"])
     with tabs[0]: _tab_roster()
     with tabs[1]: _tab_record()
-    with tabs[2]: _tab_log()
-    with tabs[3]: _tab_score()
-    with tabs[4]: _tab_detail()
-    with tabs[5]: _tab_visual()
+    with tabs[2]: _tab_score()
+    with tabs[3]: _tab_detail()
+    with tabs[4]: _tab_visual()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
