@@ -765,42 +765,47 @@ def _tab_record():
                     ss.selected_context = gl.default_context(act)
                     st.rerun()
 
-    # ── 品質按鈕（有選擇動作時才顯示）────────────────────────────────────────
+    # ── 品質按鈕（時刻顯示，未選動作時 disabled）────────────────────────────
     if ss.selected_action:
         ctx_display = ss.selected_context or gl.default_context(ss.selected_action)
-        # 注入標記 + CSS：用 :has() 精確定位緊接在此標記後的 5 欄按鈕
-        st.markdown(
-            f"<span id='qsec' style='display:none;'></span>"
-            f"<div style='margin:10px 0 4px;font-size:12px;color:#7a849e;'>"
-            f"品質　<b style='color:#e8eaf2;'>{ss.selected_action} — {ctx_display}</b></div>"
-            """<style>
+        q_label_html = (
+            f"<b style='color:#e8eaf2;'>{ss.selected_action} — {ctx_display}</b>"
+        )
+    else:
+        q_label_html = "<span style='color:#4a5270;'>請先在上方選擇動作</span>"
+    st.markdown(
+        f"<span id='qsec' style='display:none;'></span>"
+        f"<div style='margin:10px 0 4px;font-size:12px;color:#7a849e;'>"
+        f"品質　{q_label_html}</div>"
+        """<style>
 div:has(>#qsec) + div[data-testid="stHorizontalBlock"] button {
     min-height: 72px !important; font-size: 18px !important; font-weight: 900 !important;
 }
-div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(1) button:not(:disabled) {
     color:#3ecf6a!important; border-color:#3ecf6a55!important; background:#0c1e12!important;
 }
-div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:not(:disabled) {
     color:#4a9eff!important; border-color:#4a9eff55!important; background:#0c1525!important;
 }
-div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(3) button:not(:disabled) {
     color:#c8d2e8!important; border-color:#3a4560!important;
 }
-div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(4) button {
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(4) button:not(:disabled) {
     color:#f5a623!important; border-color:#f5a62355!important; background:#1e1608!important;
 }
-div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(5) button {
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(5) button:not(:disabled) {
     color:#e84343!important; border-color:#e8434355!important; background:#1e0808!important;
 }
 </style>""",
-            unsafe_allow_html=True,
-        )
-        q_cols = st.columns(5)
-        for i, q in enumerate(gl.Q_KEYS):
-            with q_cols[i]:
-                if st.button(f"{q}\n{gl.QUALITY_LABELS[q]}", key=f"quality_{q}",
-                             use_container_width=True):
-                    add_log(q); st.rerun()
+        unsafe_allow_html=True,
+    )
+    q_cols = st.columns(5)
+    for i, q in enumerate(gl.Q_KEYS):
+        with q_cols[i]:
+            if st.button(f"{q}\n{gl.QUALITY_LABELS[q]}", key=f"quality_{q}",
+                         disabled=not ss.selected_action,
+                         use_container_width=True):
+                add_log(q); st.rerun()
 
     # ── 本分結果 ─────────────────────────────────────────────────────────────
     st.markdown(
