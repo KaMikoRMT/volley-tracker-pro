@@ -768,60 +768,73 @@ def _tab_record():
     # ── 品質按鈕（有選擇動作時才顯示）────────────────────────────────────────
     if ss.selected_action:
         ctx_display = ss.selected_context or gl.default_context(ss.selected_action)
+        # 注入標記 + CSS：用 :has() 精確定位緊接在此標記後的 5 欄按鈕
         st.markdown(
+            f"<span id='qsec' style='display:none;'></span>"
             f"<div style='margin:10px 0 4px;font-size:12px;color:#7a849e;'>"
-            f"品質　<b style='color:#e8eaf2;'>{ss.selected_action} — {ctx_display}</b></div>",
+            f"品質　<b style='color:#e8eaf2;'>{ss.selected_action} — {ctx_display}</b></div>"
+            """<style>
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] button {
+    min-height: 72px !important; font-size: 18px !important; font-weight: 900 !important;
+}
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {
+    color:#3ecf6a!important; border-color:#3ecf6a55!important; background:#0c1e12!important;
+}
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+    color:#4a9eff!important; border-color:#4a9eff55!important; background:#0c1525!important;
+}
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
+    color:#c8d2e8!important; border-color:#3a4560!important;
+}
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(4) button {
+    color:#f5a623!important; border-color:#f5a62355!important; background:#1e1608!important;
+}
+div:has(>#qsec) + div[data-testid="stHorizontalBlock"] > div:nth-child(5) button {
+    color:#e84343!important; border-color:#e8434355!important; background:#1e0808!important;
+}
+</style>""",
             unsafe_allow_html=True,
         )
-        _Q_COLORS = ["#3ecf6a", "#4a9eff", "#c8d2e8", "#f5a623", "#e84343"]
-        _Q_BKGS   = ["#0b1a10", "#0b1320", "#141820", "#1c1408", "#1c0808"]
         q_cols = st.columns(5)
         for i, q in enumerate(gl.Q_KEYS):
             with q_cols[i]:
-                col = _Q_COLORS[i]; bkg = _Q_BKGS[i]
-                # 彩色視覺標頭
-                st.markdown(
-                    f"<div style='background:{bkg};border:1.5px solid {col}55;"
-                    f"border-bottom:none;border-radius:10px 10px 0 0;"
-                    f"padding:10px 4px 6px;text-align:center;'>"
-                    f"<div style='font-size:26px;font-weight:900;color:{col};line-height:1;'>{q}</div>"
-                    f"<div style='font-size:11px;color:#8090a8;margin-top:3px;'>{gl.QUALITY_LABELS[q]}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                # 實際點擊按鈕（接在卡片正下方）
-                st.markdown(
-                    f"<style>div[data-testid='stButton']:has(button[data-testid='baseButton-secondary']"
-                    f"[kind='secondary']) + div {{ margin-top:-2px; }}</style>",
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "　", key=f"quality_{q}", use_container_width=True,
-                ):
+                if st.button(f"{q}\n{gl.QUALITY_LABELS[q]}", key=f"quality_{q}",
+                             use_container_width=True):
                     add_log(q); st.rerun()
 
     # ── 本分結果 ─────────────────────────────────────────────────────────────
-    st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<span id='ressec' style='display:none;'></span>"
+        """<style>
+div:has(>#ressec) + div[data-testid="stHorizontalBlock"] button {
+    min-height: 62px !important; font-size: 13px !important; font-weight: 800 !important;
+}
+div:has(>#ressec) + div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {
+    color:#3ecf6a!important; border-color:#3ecf6a!important; background:#0c1e12!important;
+}
+div:has(>#ressec) + div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+    color:#4dbb79!important; border-color:#4dbb7966!important; background:#0c1a10!important;
+    border-style: dashed !important;
+}
+div:has(>#ressec) + div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
+    color:#e84343!important; border-color:#e84343!important; background:#2a0a0a!important;
+}
+div:has(>#ressec) + div[data-testid="stHorizontalBlock"] > div:nth-child(4) button {
+    color:#f5a623!important; border-color:#f5a62366!important; background:#1e1608!important;
+}
+</style>""",
+        unsafe_allow_html=True,
+    )
     _RESULT_CFG = [
-        ("✓ 我方得分", "win",      "最後觸球加成", "#1a3a1a", "#3ecf6a"),
-        ("＋ 對方失誤", "oppError", "不加成球員",  "#0e1e14", "#4dbb79"),
-        ("✗ 我方失分", "lose",     "最後觸球扣分", "#2e0e0e", "#e84343"),
-        ("○ 對手好球", "opponent", "不扣分",       "#1e1608", "#f5a623"),
+        ("✓ 我方得分\n最後觸球加成", "win"),
+        ("＋ 對方失誤\n不加成球員",  "oppError"),
+        ("✗ 我方失分\n最後觸球扣分", "lose"),
+        ("○ 對手好球\n不扣分",       "opponent"),
     ]
     res_cols = st.columns(4)
-    for col, (label, ptype, sub, bg, border) in zip(res_cols, _RESULT_CFG):
+    for col, (label, ptype) in zip(res_cols, _RESULT_CFG):
         with col:
-            # 彩色卡片標頭（無負 margin，乾淨疊加）
-            st.markdown(
-                f"<div style='background:{bg};border:2px solid {border};"
-                f"border-bottom:none;border-radius:10px 10px 0 0;"
-                f"padding:8px 6px 5px;text-align:center;'>"
-                f"<div style='font-size:13px;font-weight:800;color:{border};'>{label}</div>"
-                f"<div style='font-size:10px;color:#7a849e;margin-top:2px;'>{sub}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            if st.button("▲", key=f"res_{ptype}", use_container_width=True):
+            if st.button(label, key=f"res_{ptype}", use_container_width=True):
                 resolve_point(ptype); st.rerun()
 
     # ── 本局紀錄（快記下方）──────────────────────────────────────────────────
