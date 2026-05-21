@@ -24,12 +24,90 @@ st.set_page_config(
 storage.init_db()
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 全域 CSS
+# ══════════════════════════════════════════════════════════════════════════════
+GLOBAL_CSS = """
+<style>
+#MainMenu, footer { display:none !important; }
+[data-testid="stHeader"] { display:none !important; }
+[data-testid="stSidebar"] { display:none !important; }
+.block-container { padding-top:0.75rem !important; padding-bottom:1rem !important; }
+
+/* ── Tab pill nav ── */
+[data-testid="stTabs"] [role="tablist"] {
+    gap: 5px !important; background: transparent !important;
+    border-bottom: none !important;
+}
+[data-testid="stTabs"] [role="tab"] {
+    background: #141820 !important;
+    border: 1.5px solid #252d42 !important;
+    border-radius: 8px !important;
+    color: #7a849e !important;
+    font-size: 13px !important; font-weight: 700 !important;
+    padding: 4px 16px !important; min-height: 32px !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    background: #f5a623 !important;
+    border-color: #f5a623 !important;
+    color: #000 !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+[data-testid="stTabs"] [data-baseweb="tab-border"] { display:none !important; }
+
+/* ── General buttons ── */
+div[data-testid="stButton"] button {
+    border-radius: 10px !important; font-weight: 700 !important;
+    font-size: 14px !important; min-height: 50px !important;
+    transition: all 0.15s ease !important;
+}
+div[data-testid="stButton"] button[kind="secondary"] {
+    background: #141820 !important;
+    border: 1.5px solid #252d42 !important;
+    color: #bec8de !important;
+}
+div[data-testid="stButton"] button[kind="secondary"]:hover {
+    border-color: #f5a623 !important; color: #f5a623 !important;
+    background: #1f1b0f !important;
+}
+
+/* ── Set selector pills (小一點) ── */
+.set-row div[data-testid="stButton"] button {
+    min-height: 36px !important; border-radius: 20px !important;
+    font-size: 13px !important; padding: 0 14px !important;
+}
+
+/* ── Quality buttons per column (5-col layout) ── */
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) button[kind="secondary"] {
+    color: #3ecf6a !important; border-color: #3ecf6a55 !important; background: #0b1a10 !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) button[kind="secondary"] {
+    color: #4a9eff !important; border-color: #4a9eff55 !important; background: #0b1320 !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) button[kind="secondary"] {
+    color: #c8d2e8 !important; border-color: #2e3854 !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) button[kind="secondary"] {
+    color: #f5a623 !important; border-color: #f5a62355 !important; background: #1c1408 !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) button[kind="secondary"] {
+    color: #e84343 !important; border-color: #e8434355 !important; background: #1c0808 !important;
+}
+
+/* ── Containers / cards ── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 14px !important; border-color: #252d42 !important;
+    background: #0e1320 !important;
+}
+</style>
+"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Session State 初始化
 # ══════════════════════════════════════════════════════════════════════════════
 DEFAULTS = {
     "page": "home",
     "user_code": None,
-    # ── 記錄中的比賽 ─────────────────────────
     "match_id": None,
     "match_name": "",
     "players": [
@@ -39,7 +117,6 @@ DEFAULTS = {
     ],
     "logs": [],
     "current_set": 1,
-    # ── 快記狀態 ─────────────────────────────
     "selected_player_id": 1,
     "selected_action": None,
     "selected_context": None,
@@ -48,9 +125,8 @@ DEFAULTS = {
         "logId": None, "playerId": None, "context": None,
     },
     "history_stack": [],
-    # ── 分析 ─────────────────────────────────
     "selected_match_ids": [],
-    "view_set": None,           # None=完整比賽, 1/2/3=特定局
+    "view_set": None,
 }
 
 for k, v in DEFAULTS.items():
@@ -59,7 +135,7 @@ for k, v in DEFAULTS.items():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 工具函式
+# 工具函式（邏輯不變）
 # ══════════════════════════════════════════════════════════════════════════════
 
 def go(page: str):
@@ -68,7 +144,6 @@ def go(page: str):
 
 
 def auto_save():
-    """若已有 match_id 就更新資料庫，否則先建立"""
     ss = st.session_state
     if ss.match_id is None:
         ss.match_id = storage.create_match(
@@ -115,7 +190,6 @@ def add_log(quality: str):
     score_delta, note = gl.compute_score_delta(quality, ss.prev_action_state, action)
     log_id = str(uuid.uuid4())
 
-    # 舉球→攻擊失分 → 更新舉球員那筆紀錄
     prev = ss.prev_action_state
     if prev.get("action") == "舉球" and action == "攻擊":
         if prev.get("quality") in ["B", "C", "F"] and quality == "F":
@@ -131,19 +205,12 @@ def add_log(quality: str):
                     break
 
     new_log = {
-        "id": log_id,
-        "type": "action",
-        "setNo": ss.current_set,
-        "playerId": player_id,
-        "action": action,
-        "context": context,
-        "quality": quality,
-        "prevQuality": prev.get("quality"),
-        "prevAction": prev.get("action"),
-        "prevPlayerId": prev.get("playerId"),
-        "prevContext": prev.get("context"),
-        "scoreDelta": score_delta,
-        "note": note,
+        "id": log_id, "type": "action",
+        "setNo": ss.current_set, "playerId": player_id,
+        "action": action, "context": context, "quality": quality,
+        "prevQuality": prev.get("quality"), "prevAction": prev.get("action"),
+        "prevPlayerId": prev.get("playerId"), "prevContext": prev.get("context"),
+        "scoreDelta": score_delta, "note": note,
         "timestamp": datetime.now().strftime("%H:%M:%S"),
     }
 
@@ -158,7 +225,6 @@ def add_log(quality: str):
 
 
 def resolve_point(point_type: str):
-    """結束這分：win / oppError / lose / opponent"""
     ss = st.session_state
     save_history()
 
@@ -175,7 +241,6 @@ def resolve_point(point_type: str):
         delta = 20 if point_type == "win" else -20
         note_str = "得分加成" if point_type == "win" else "失分責任"
         cur_set = ss.current_set
-        # 找本局最後一筆 action
         for i, l in enumerate(ss.logs):
             if l.get("type") == "action" and l.get("setNo", 1) == cur_set:
                 old_note = l.get("note", "")
@@ -187,11 +252,8 @@ def resolve_point(point_type: str):
                 break
 
     divider = {
-        "id": str(uuid.uuid4()),
-        "type": "divider",
-        "setNo": ss.current_set,
-        "result": result_label,
-        "winner": winner,
+        "id": str(uuid.uuid4()), "type": "divider",
+        "setNo": ss.current_set, "result": result_label, "winner": winner,
     }
     ss.logs.insert(0, divider)
     ss.prev_action_state = {k: None for k in ss.prev_action_state}
@@ -201,7 +263,6 @@ def resolve_point(point_type: str):
 
 
 def get_rally_logs():
-    """本局、本分（上一個 divider 之前）的 action 紀錄"""
     ss = st.session_state
     out = []
     for l in ss.logs:
@@ -214,11 +275,6 @@ def get_rally_logs():
 
 
 def merge_matches_for_analysis(match_ids: list) -> tuple[list, list]:
-    """
-    合併多場比賽資料。
-    同名球員視為同一人（使用 name 作為主鍵，pos 取第一場的設定）。
-    回傳 (unified_players, merged_logs)
-    """
     name_to_player: dict[str, dict] = {}
     name_to_new_id: dict[str, str] = {}
     merged_logs: list[dict] = []
@@ -227,7 +283,6 @@ def merge_matches_for_analysis(match_ids: list) -> tuple[list, list]:
         m = storage.get_match(mid)
         if not m:
             continue
-        # 建立舊 id → 新 id 的對應
         old_to_new: dict = {}
         for p in m["players"]:
             name = p["name"]
@@ -251,7 +306,7 @@ def merge_matches_for_analysis(match_ids: list) -> tuple[list, list]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Plotly 圖表工具函式
+# Plotly 圖表函式
 # ══════════════════════════════════════════════════════════════════════════════
 
 _PLOTLY_LAYOUT = dict(
@@ -264,7 +319,6 @@ _RADAR_GRID = dict(gridcolor="#252b3b", color="#7a849e")
 
 
 def _fig_radar(stats: dict, color: str = "#f5a623") -> pgo.Figure | None:
-    """球員屬性雷達圖。少於 3 項時回傳 None。"""
     keys = list(stats.keys())
     if len(keys) < 3:
         return None
@@ -278,24 +332,20 @@ def _fig_radar(stats: dict, color: str = "#f5a623") -> pgo.Figure | None:
         marker=dict(size=5, color=color),
     ))
     fig.update_layout(
-        **_PLOTLY_LAYOUT,
-        height=260,
+        **_PLOTLY_LAYOUT, height=240, showlegend=False,
         polar=dict(
             radialaxis=dict(visible=True, range=[0, 100], **_RADAR_GRID),
-            angularaxis=_RADAR_GRID,
-            bgcolor="rgba(0,0,0,0)",
+            angularaxis=_RADAR_GRID, bgcolor="rgba(0,0,0,0)",
         ),
-        showlegend=False,
     )
     return fig
 
 
 def _fig_donut(groups: dict, total: int) -> pgo.Figure:
-    """攻擊策略中空圓餅圖。"""
     ctx_def = [("一般攻擊", "#4a9eff"), ("吊球", "#f5a623"), ("處理球", "#3ecf6a")]
-    labels  = [c for c, _ in ctx_def]
-    values  = [len(groups.get(c, [])) for c, _ in ctx_def]
-    colors  = [col for _, col in ctx_def]
+    labels = [c for c, _ in ctx_def]
+    values = [len(groups.get(c, [])) for c, _ in ctx_def]
+    colors = [col for _, col in ctx_def]
     fig = pgo.Figure(pgo.Pie(
         labels=labels, values=values, hole=0.55,
         marker=dict(colors=colors, line=dict(color="rgba(12,14,19,1)", width=3)),
@@ -308,7 +358,6 @@ def _fig_donut(groups: dict, total: int) -> pgo.Figure:
 
 
 def _fig_score_bar(groups: dict) -> pgo.Figure | None:
-    """攻擊各策略評分水平長條圖。"""
     ctx_def = [("一般攻擊", "#4a9eff"), ("吊球", "#f5a623"), ("處理球", "#3ecf6a")]
     labels, scores, colors = [], [], []
     for ctx, col in ctx_def:
@@ -327,12 +376,9 @@ def _fig_score_bar(groups: dict) -> pgo.Figure | None:
     ))
     fig.update_layout(
         **{k: v for k, v in _PLOTLY_LAYOUT.items() if k != "margin"},
-        height=160,
-        margin=dict(l=10, r=55, t=20, b=10),
-        xaxis=dict(
-            range=[-100, 100], gridcolor="#252b3b", color="#7a849e",
-            zeroline=True, zerolinecolor="#505a6e", showticklabels=False,
-        ),
+        height=160, margin=dict(l=10, r=55, t=20, b=10),
+        xaxis=dict(range=[-100, 100], gridcolor="#252b3b", color="#7a849e",
+                   zeroline=True, zerolinecolor="#505a6e", showticklabels=False),
         yaxis=dict(gridcolor="rgba(0,0,0,0)", color="#e8eaf2"),
         showlegend=False,
     )
@@ -340,7 +386,6 @@ def _fig_score_bar(groups: dict) -> pgo.Figure | None:
 
 
 def _fig_setter_heatmap(heatmap: dict) -> pgo.Figure:
-    """舉球品質熱力圖。行=舉球品質，列=一傳品質。"""
     Q = gl.Q_KEYS
     z = [[heatmap.get(f"{pq}|{sq}", 0) for pq in Q] for sq in Q]
     max_val = max((v for row in z for v in row), default=1) or 1
@@ -355,8 +400,7 @@ def _fig_setter_heatmap(heatmap: dict) -> pgo.Figure:
     ))
     fig.update_layout(
         **{k: v for k, v in _PLOTLY_LAYOUT.items() if k != "margin"},
-        height=230,
-        margin=dict(l=70, r=10, t=40, b=60),
+        height=230, margin=dict(l=70, r=10, t=40, b=60),
         xaxis=dict(side="top", gridcolor="#252b3b", color="#7a849e"),
         yaxis=dict(gridcolor="#252b3b", color="#7a849e", autorange="reversed"),
     )
@@ -364,7 +408,6 @@ def _fig_setter_heatmap(heatmap: dict) -> pgo.Figure:
 
 
 def _fig_defense_radar(def_data: list) -> pgo.Figure | None:
-    """團隊防守雷達圖。"""
     filled = [(d["ctx"], d["score"]) for d in def_data if d["arr"]]
     if len(filled) < 3:
         return None
@@ -387,10 +430,11 @@ def _fig_defense_radar(def_data: list) -> pgo.Figure | None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── 首頁 ──────────────────────────────────────────────────────────────────────
+# 首頁
 # ══════════════════════════════════════════════════════════════════════════════
 
 def page_home():
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     st.markdown(
         "<h1 style='text-align:center;color:#f5a623;letter-spacing:3px;'>🏐 VOLLEY TRACKER PRO</h1>",
         unsafe_allow_html=True,
@@ -407,8 +451,7 @@ def page_home():
         st.subheader("🔑 已有代碼？輸入載入")
         code_input = st.text_input(
             "輸入您的 8 碼個人代碼",
-            max_chars=8,
-            placeholder="例：A1B2C3D4",
+            max_chars=8, placeholder="例：A1B2C3D4",
         ).upper().strip()
         if st.button("載入我的比賽紀錄", type="primary", use_container_width=True):
             if not code_input:
@@ -422,9 +465,7 @@ def page_home():
 
     with col2:
         st.subheader("✨ 第一次使用？建立新帳號")
-        st.markdown(
-            "系統將為您產生一組**唯一代碼**，請務必**記錄下來**，之後憑此代碼載入所有比賽紀錄。"
-        )
+        st.markdown("系統將為您產生一組**唯一代碼**，請務必**記錄下來**，之後憑此代碼載入所有比賽紀錄。")
         if st.button("建立新帳號並取得代碼", use_container_width=True):
             code = storage.create_user()
             st.session_state.user_code = code
@@ -436,57 +477,50 @@ def page_home():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── 我的比賽 ──────────────────────────────────────────────────────────────────
+# 我的比賽
 # ══════════════════════════════════════════════════════════════════════════════
 
 def page_matches():
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     ss = st.session_state
     code = ss.user_code
 
     st.markdown(
-        f"<h2 style='color:#f5a623;'>📋 我的比賽　<span style='font-size:14px;color:#7a849e;'>代碼：{code}</span></h2>",
+        f"<h2 style='color:#f5a623;'>📋 我的比賽　"
+        f"<span style='font-size:14px;color:#7a849e;'>代碼：{code}</span></h2>",
         unsafe_allow_html=True,
     )
 
     col_new, col_analyze, col_logout = st.columns([2, 2, 1])
     with col_new:
         if st.button("➕ 新增比賽", type="primary", use_container_width=True):
-            # 重置記錄狀態
-            ss.match_id = None
-            ss.match_name = ""
+            ss.match_id = None; ss.match_name = ""
             ss.players = [
                 {"id": 1, "name": "球員A", "pos": "大砲"},
                 {"id": 2, "name": "球員B", "pos": "舉球"},
                 {"id": 3, "name": "球員C", "pos": "自由"},
             ]
-            ss.logs = []
-            ss.current_set = 1
+            ss.logs = []; ss.current_set = 1
             ss.selected_player_id = 1
-            ss.selected_action = None
-            ss.selected_context = None
+            ss.selected_action = None; ss.selected_context = None
             ss.prev_action_state = {k: None for k in ss.prev_action_state}
             ss.history_stack = []
             go("setup")
-
     with col_analyze:
         if st.button("📊 分析選中比賽", use_container_width=True, disabled=not ss.selected_match_ids):
             go("analysis")
-
     with col_logout:
         if st.button("登出", use_container_width=True):
-            ss.user_code = None
-            ss.selected_match_ids = []
+            ss.user_code = None; ss.selected_match_ids = []
             go("home")
 
     st.divider()
-
     matches = storage.get_user_matches(code)
 
     if not matches:
         st.info("尚無比賽紀錄，點擊「新增比賽」開始記錄！")
         return
 
-    # 說明文字
     st.caption("☑️ 勾選要納入分析的比賽，再點「分析選中比賽」")
 
     for m in matches:
@@ -498,36 +532,26 @@ def page_matches():
 
         with st.container(border=True):
             c1, c2, c3, c4 = st.columns([0.5, 3, 1.5, 1])
-
             with c1:
-                checked = st.checkbox(
-                    "", key=f"chk_{mid}",
-                    value=(mid in ss.selected_match_ids),
-                )
+                checked = st.checkbox("", key=f"chk_{mid}", value=(mid in ss.selected_match_ids))
                 if checked and mid not in ss.selected_match_ids:
                     ss.selected_match_ids.append(mid)
                 elif not checked and mid in ss.selected_match_ids:
                     ss.selected_match_ids.remove(mid)
-
             with c2:
                 st.markdown(f"**{mname}**")
                 st.caption(f"🕐 {created}　｜　動作紀錄 {n_logs} 筆　｜　第 {n_sets} 局")
-
             with c3:
                 if st.button("▶ 繼續記錄", key=f"cont_{mid}", use_container_width=True):
                     data = storage.get_match(mid)
-                    ss.match_id = mid
-                    ss.match_name = data["match_name"]
-                    ss.players = data["players"]
-                    ss.logs = data["logs"]
+                    ss.match_id = mid; ss.match_name = data["match_name"]
+                    ss.players = data["players"]; ss.logs = data["logs"]
                     ss.current_set = data.get("current_set", 1)
                     ss.selected_player_id = data["players"][0]["id"] if data["players"] else None
-                    ss.selected_action = None
-                    ss.selected_context = None
+                    ss.selected_action = None; ss.selected_context = None
                     ss.prev_action_state = {k: None for k in ss.prev_action_state}
                     ss.history_stack = []
                     go("record")
-
             with c4:
                 if st.button("🗑️ 刪除", key=f"del_{mid}", use_container_width=True):
                     storage.delete_match(mid)
@@ -537,38 +561,35 @@ def page_matches():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── 新增比賽（設定球員） ───────────────────────────────────────────────────────
+# 新增比賽設定
 # ══════════════════════════════════════════════════════════════════════════════
 
 def page_setup():
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     ss = st.session_state
     st.markdown("<h2 style='color:#f5a623;'>⚙️ 新增比賽 — 設定球員</h2>", unsafe_allow_html=True)
 
     if st.button("← 返回比賽列表"):
         go("matches")
-
     st.divider()
 
-    # 比賽名稱
     ss.match_name = st.text_input(
         "📝 比賽名稱（可留空，預設用日期）",
         value=ss.match_name or f"比賽 {datetime.now().strftime('%m/%d %H:%M')}",
     )
-
     st.subheader("👥 球員設定")
 
     players = ss.players[:]
     to_delete = None
-
     for i, p in enumerate(players):
         c1, c2, c3, c4 = st.columns([0.4, 2, 1.5, 0.5])
-        with c1:
-            st.markdown(f"**{i+1}**")
+        with c1: st.markdown(f"**{i+1}**")
         with c2:
             new_name = st.text_input(f"姓名_{i}", value=p["name"], label_visibility="collapsed", key=f"pname_{i}")
             players[i]["name"] = new_name
         with c3:
-            new_pos = st.selectbox(f"位置_{i}", gl.POSITIONS, index=gl.POSITIONS.index(p["pos"]), label_visibility="collapsed", key=f"ppos_{i}")
+            new_pos = st.selectbox(f"位置_{i}", gl.POSITIONS, index=gl.POSITIONS.index(p["pos"]),
+                                   label_visibility="collapsed", key=f"ppos_{i}")
             players[i]["pos"] = new_pos
         with c4:
             if st.button("×", key=f"pdel_{i}"):
@@ -579,20 +600,13 @@ def page_setup():
     ss.players = players
 
     if st.button("➕ 新增球員"):
-        ss.players.append({
-            "id": int(time.time() * 1000) % 1_000_000,
-            "name": f"球員{len(ss.players)+1}",
-            "pos": "大砲",
-        })
+        ss.players.append({"id": int(time.time() * 1000) % 1_000_000, "name": f"球員{len(ss.players)+1}", "pos": "大砲"})
         st.rerun()
-
     st.divider()
-
     if st.button("🏐 開始記錄這場比賽", type="primary", use_container_width=True):
         if not ss.players:
             st.error("至少需要一位球員！")
             return
-        # 確保 match_name 不空
         if not ss.match_name.strip():
             ss.match_name = f"比賽 {datetime.now().strftime('%m/%d %H:%M')}"
         ss.selected_player_id = ss.players[0]["id"]
@@ -600,167 +614,172 @@ def page_setup():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── 快速記錄 ──────────────────────────────────────────────────────────────────
+# 比賽主畫面（含 Tab）
 # ══════════════════════════════════════════════════════════════════════════════
 
-def page_record():
+def _render_match_header():
+    """頂部 Logo + 結束按鈕列"""
     ss = st.session_state
-
-    # ── 全域按鈕樣式注入 ──────────────────────────────────────────────────────
-    st.markdown("""
-<style>
-div[data-testid="stButton"] button {
-    min-height: 54px !important;
-    border-radius: 10px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.2px;
-}
-div[data-testid="stButton"] button[kind="secondary"] {
-    background: #1a1f30 !important;
-    border: 1.5px solid #3a4560 !important;
-    color: #c8d2e8 !important;
-}
-div[data-testid="stButton"] button[kind="secondary"]:hover {
-    border-color: #f5a623 !important;
-    color: #f5a623 !important;
-    background: #211e12 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-    # ── 頂部資訊列 ────────────────────────────────────────────────────────────
-    hcol1, hcol2, hcol3 = st.columns([3, 2, 1])
-    with hcol1:
-        st.markdown(f"<h2 style='color:#f5a623;margin-bottom:0;'>⚡ {ss.match_name}</h2>", unsafe_allow_html=True)
-    with hcol2:
-        # 局數切換
-        set_cols = st.columns(4)
-        for idx, n in enumerate([1, 2, 3]):
-            with set_cols[idx]:
-                active = ss.current_set == n
-                if st.button(f"第{n}局", key=f"set_{n}",
-                             type="primary" if active else "secondary",
-                             use_container_width=True):
-                    ss.current_set = n
-                    ss.selected_action = None
-                    ss.selected_context = None
-                    ss.prev_action_state = {k: None for k in ss.prev_action_state}
-                    st.rerun()
-        with set_cols[3]:
-            if st.button("＋局", disabled=ss.current_set >= 3,
-                         use_container_width=True, key="nextset"):
-                ss.current_set = min(3, ss.current_set + 1)
-                ss.selected_action = None
-                ss.selected_context = None
-                ss.prev_action_state = {k: None for k in ss.prev_action_state}
-                st.rerun()
-    with hcol3:
-        if st.button("← 離開", use_container_width=True):
+    h1, h2 = st.columns([5, 1.2])
+    with h1:
+        st.markdown(
+            "<div style='padding:2px 0 6px;'>"
+            "<span style='font-size:20px;font-weight:900;letter-spacing:2px;color:#f5a623;'>VOLLEY TRACKER PRO</span>"
+            "<span style='font-size:11px;color:#7a849e;margin-left:12px;'>智慧快記 × 視覺分析 × 分局報告</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with h2:
+        if st.button("💾 結束存檔", use_container_width=True, key="exit_match"):
             auto_save()
             go("matches")
 
-    st.divider()
 
-    # ── 球員選擇 ──────────────────────────────────────────────────────────────
-    st.markdown("**👤 選擇球員**")
-    p_cols = st.columns(len(ss.players))
-    for i, p in enumerate(ss.players):
-        with p_cols[i]:
-            is_sel = ss.selected_player_id == p["id"]
-            if st.button(
-                f"{p['name']}\n({p['pos']})",
-                key=f"player_sel_{p['id']}",
-                type="primary" if is_sel else "secondary",
-                use_container_width=True,
-            ):
-                ss.selected_player_id = p["id"]
-                ss.selected_action = None
-                ss.selected_context = None
+def _render_set_selector():
+    """局數切換列（pill 樣式）"""
+    ss = st.session_state
+    st.markdown('<div class="set-row">', unsafe_allow_html=True)
+    sc = st.columns([1, 1, 1, 1.3, 8])
+    for col, n, lbl in zip(sc[:3], [1, 2, 3], ["第1局", "第2局", "第3局"]):
+        with col:
+            if st.button(lbl, key=f"set_{n}",
+                         type="primary" if ss.current_set == n else "secondary",
+                         use_container_width=True):
+                ss.current_set = n
+                ss.selected_action = None; ss.selected_context = None
+                ss.prev_action_state = {k: None for k in ss.prev_action_state}
+                st.rerun()
+    with sc[3]:
+        if st.button("+ 下一局", disabled=ss.current_set >= 3,
+                     use_container_width=True, key="nextset"):
+            ss.current_set = min(3, ss.current_set + 1)
+            ss.selected_action = None; ss.selected_context = None
+            ss.prev_action_state = {k: None for k in ss.prev_action_state}
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _tab_roster():
+    """名單 tab：可編輯球員"""
+    ss = st.session_state
+    with st.container(border=True):
+        st.markdown("**👥 球員名單**　<span style='color:#7a849e;font-size:12px;'>可於比賽中修改名稱與位置</span>",
+                    unsafe_allow_html=True)
+        players = ss.players[:]
+        to_delete = None
+        for i, p in enumerate(players):
+            c1, c2, c3, c4 = st.columns([0.4, 2, 1.5, 0.5])
+            with c1: st.markdown(f"**{i+1}**")
+            with c2:
+                new_name = st.text_input(f"姓名_{i}", value=p["name"],
+                                         label_visibility="collapsed", key=f"rname_{i}")
+                players[i]["name"] = new_name
+            with c3:
+                new_pos = st.selectbox(f"位置_{i}", gl.POSITIONS,
+                                       index=gl.POSITIONS.index(p["pos"]) if p["pos"] in gl.POSITIONS else 0,
+                                       label_visibility="collapsed", key=f"rpos_{i}")
+                players[i]["pos"] = new_pos
+            with c4:
+                if st.button("×", key=f"rdel_{i}"):
+                    to_delete = i
+        if to_delete is not None:
+            players.pop(to_delete)
+        ss.players = players
+        if st.button("➕ 新增球員", key="roster_add"):
+            ss.players.append({"id": int(time.time() * 1000) % 1_000_000,
+                                "name": f"球員{len(ss.players)+1}", "pos": "大砲"})
+            st.rerun()
+
+
+def _tab_record():
+    """智慧快記 tab"""
+    ss = st.session_state
+
+    with st.container(border=True):
+        # 標題列
+        th1, th2, th3 = st.columns([4, 1, 1])
+        with th1:
+            st.markdown(
+                "<span style='font-size:16px;font-weight:800;'>⚡ 智慧快記</span>"
+                "<span style='color:#7a849e;font-size:11px;margin-left:10px;'>"
+                "依照前置動作、位置與本分狀態自動縮小選項。現在是第 "
+                f"{ss.current_set} 局。</span>",
+                unsafe_allow_html=True,
+            )
+        with th2:
+            if st.button("↩ 復原", disabled=not ss.history_stack,
+                         use_container_width=True, key="undo_btn"):
+                do_undo(); st.rerun()
+        with th3:
+            if st.button("↻ 斷開前置", use_container_width=True, key="reset_btn"):
+                ss.prev_action_state = {k: None for k in ss.prev_action_state}
+                ss.selected_action = None; ss.selected_context = None
                 st.rerun()
 
-    # ── 狀態列 ────────────────────────────────────────────────────────────────
-    sel_player = next((p for p in ss.players if p["id"] == ss.selected_player_id), None)
-    prev = ss.prev_action_state
-    prev_label = f"{prev.get('context') or prev.get('action')} ({prev.get('quality')})" if prev.get("action") else "無"
+        # 球員選擇 + 狀態資訊（同一行）
+        sel_player = next((p for p in ss.players if p["id"] == ss.selected_player_id), None)
+        prev = ss.prev_action_state
+        prev_label = (f"{prev.get('context') or prev.get('action')} ({prev.get('quality')})"
+                      if prev.get("action") else "無")
+        rally_logs = get_rally_logs()
+        used_serve = any(l.get("action") == "發球" for l in rally_logs)
+        used_receive = any(l.get("action") == "接發" for l in rally_logs)
+        last_divider = next((l for l in ss.logs if l["type"] == "divider"
+                             and l.get("setNo", 1) == ss.current_set), None)
+        last_winner = last_divider["winner"] if last_divider else None
 
-    rally_logs = get_rally_logs()
-    used_serve = any(l.get("action") == "發球" for l in rally_logs)
-    used_receive = any(l.get("action") == "接發" for l in rally_logs)
-    last_divider = next((l for l in ss.logs if l["type"] == "divider" and l.get("setNo", 1) == ss.current_set), None)
-    last_winner = last_divider["winner"] if last_divider else None
+        p_cols = st.columns(len(ss.players))
+        for i, p in enumerate(ss.players):
+            with p_cols[i]:
+                is_sel = ss.selected_player_id == p["id"]
+                if st.button(
+                    f"{i+1}. {p['name']} ({p['pos']})",
+                    key=f"player_sel_{p['id']}",
+                    type="primary" if is_sel else "secondary",
+                    use_container_width=True,
+                ):
+                    ss.selected_player_id = p["id"]
+                    ss.selected_action = None; ss.selected_context = None
+                    st.rerun()
 
-    _s_col = "#3ecf6a"
-    _g_col = "#3a4560"
-    st.markdown(
-        f"<div style='display:flex;gap:10px;margin:6px 0 10px;flex-wrap:wrap;'>"
-        f"<div style='background:#141720;border:1.5px solid #f5a623;border-radius:8px;"
-        f"padding:5px 16px;font-size:13px;'>"
-        f"<span style='color:#7a849e;'>前置　</span><b style='color:#f5a623;'>{prev_label}</b></div>"
-        f"<div style='background:#141720;border:1.5px solid {'#3ecf6a' if used_serve else _g_col};"
-        f"border-radius:8px;padding:5px 16px;font-size:13px;'>"
-        f"<span style='color:#7a849e;'>發球　</span>"
-        f"<b style='color:{'#3ecf6a' if used_serve else '#7a849e'};'>"
-        f"{'✅ 已發球' if used_serve else '未發球'}</b></div>"
-        f"<div style='background:#141720;border:1.5px solid {'#3ecf6a' if used_receive else _g_col};"
-        f"border-radius:8px;padding:5px 16px;font-size:13px;'>"
-        f"<span style='color:#7a849e;'>接發　</span>"
-        f"<b style='color:{'#3ecf6a' if used_receive else '#7a849e'};'>"
-        f"{'✅ 已接發' if used_receive else '未接發'}</b></div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+        # 緊湊狀態列
+        s_c = "#3ecf6a"; g_c = "#2e3854"
+        st.markdown(
+            f"<div style='display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 4px;"
+            f"font-size:12px;color:#7a849e;align-items:center;'>"
+            f"目前球員：<b style='color:#f5a623;'>{sel_player['name'] if sel_player else '—'}</b>"
+            f"　前置：<b style='color:#e8eaf2;'>{prev_label}</b>"
+            f"　發球/接發："
+            f"<span style='color:{'#3ecf6a' if used_serve else '#7a849e'};'>"
+            f"{'已發球' if used_serve else '未發球'}</span>"
+            f" / <span style='color:{'#3ecf6a' if used_receive else '#7a849e'};'>"
+            f"{'已接發' if used_receive else '未接發'}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-    # ── 得分結束按鈕 ──────────────────────────────────────────────────────────
-    st.markdown("**📌 本分結果**")
-    rc1, rc2, rc3, rc4 = st.columns(4)
-    with rc1:
-        if st.button("✓ 我方得分", use_container_width=True, key="win"):
-            resolve_point("win")
-            st.rerun()
-    with rc2:
-        if st.button("＋ 對方失誤", use_container_width=True, key="opperr"):
-            resolve_point("oppError")
-            st.rerun()
-    with rc3:
-        if st.button("✗ 我方失分", use_container_width=True, key="lose"):
-            resolve_point("lose")
-            st.rerun()
-    with rc4:
-        if st.button("🛡 對手好球", use_container_width=True, key="opp"):
-            resolve_point("opponent")
-            st.rerun()
-
-    st.divider()
-
-    # ── 建議動作 ──────────────────────────────────────────────────────────────
+    # ── 建議動作（大卡片）─────────────────────────────────────────────────────
     quick_opts = gl.suggest_quick_options(
-        ss.prev_action_state, sel_player,
-        used_serve, used_receive, last_winner,
+        ss.prev_action_state, sel_player, used_serve, used_receive, last_winner,
     )
 
-    st.markdown("**⚡ 建議動作**")
     if quick_opts:
         n_cols = min(len(quick_opts), 4)
         opt_cols = st.columns(n_cols)
         for i, opt in enumerate(quick_opts):
             with opt_cols[i % n_cols]:
                 is_active = (ss.selected_action == opt["a"] and ss.selected_context == opt["c"])
-                label = f"**{opt['label']}**\n{opt['why']}"
+                ctx_label = opt["c"] if opt["c"] and opt["c"] != "一般" else "一般"
+                btn_label = f"**{opt['label']}**\n{opt['why']}\n{ctx_label}"
                 if st.button(
-                    opt["label"],
-                    key=f"opt_{i}_{opt['a']}_{opt['c']}",
+                    btn_label, key=f"opt_{i}_{opt['a']}_{opt['c']}",
                     type="primary" if is_active else "secondary",
                     use_container_width=True,
-                    help=opt["why"],
                 ):
                     ss.selected_action = opt["a"]
                     ss.selected_context = opt["c"]
                     st.rerun()
-    else:
-        st.caption("（無自動建議，請用下方全動作面板）")
 
-    # ── 展開完整動作 ──────────────────────────────────────────────────────────
     with st.expander("📋 完整動作面板（進階）"):
         act_cols = st.columns(len(gl.ACTION_MAP))
         for i, (act, ainfo) in enumerate(gl.ACTION_MAP.items()):
@@ -769,7 +788,6 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
                     ss.selected_action = act
                     ss.selected_context = gl.default_context(act)
                     st.rerun()
-
         if ss.selected_action:
             ctx_list = gl.ACTION_MAP.get(ss.selected_action, {}).get("contexts") or ["一般"]
             if len(ctx_list) > 1:
@@ -780,57 +798,90 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
                         is_active = ss.selected_context == c
                         if st.button(c, key=f"ctx_{c}", use_container_width=True,
                                      type="primary" if is_active else "secondary"):
-                            ss.selected_context = c
-                            st.rerun()
+                            ss.selected_context = c; st.rerun()
 
-    # ── 品質按鈕 ──────────────────────────────────────────────────────────────
+    # ── 細項選擇 ─────────────────────────────────────────────────────────────
+    if ss.selected_action:
+        ctx_list = gl.ACTION_MAP.get(ss.selected_action, {}).get("contexts") or ["一般"]
+        if len(ctx_list) > 1 and not st.session_state.get("fullact_expanded"):
+            st.markdown("**選擇細項**")
+            chip_cols = st.columns(len(ctx_list))
+            for i, c in enumerate(ctx_list):
+                with chip_cols[i]:
+                    is_active = ss.selected_context == c
+                    if st.button(
+                        c, key=f"chip_{c}", use_container_width=True,
+                        type="primary" if is_active else "secondary",
+                    ):
+                        ss.selected_context = c; st.rerun()
+
+    # ── 品質按鈕 ─────────────────────────────────────────────────────────────
     if ss.selected_action:
         ctx_display = ss.selected_context or gl.default_context(ss.selected_action)
-        st.markdown(f"**🎯 {ss.selected_action} — {ctx_display}　選擇品質：**")
+        st.markdown(f"**品質**　<span style='color:#7a849e;font-size:12px;'>"
+                    f"動作：{ss.selected_action} — {ctx_display}</span>",
+                    unsafe_allow_html=True)
         q_cols = st.columns(5)
-        q_colors = gl.QUALITY_COLORS
         for i, q in enumerate(gl.Q_KEYS):
             with q_cols[i]:
-                label_html = f"{q}\n{gl.QUALITY_LABELS[q]}"
                 if st.button(
-                    label_html,
+                    f"{q}\n{gl.QUALITY_LABELS[q]}",
                     key=f"quality_{q}",
                     use_container_width=True,
                 ):
-                    add_log(q)
-                    st.rerun()
+                    add_log(q); st.rerun()
 
-    # ── 復原 / 斷開前置 ───────────────────────────────────────────────────────
-    undo_col, reset_col = st.columns(2)
-    with undo_col:
-        if st.button("⮌ 復原上一步", disabled=not ss.history_stack, use_container_width=True):
-            do_undo()
-            st.rerun()
-    with reset_col:
-        if st.button("↻ 斷開前置狀態", use_container_width=True):
-            ss.prev_action_state = {k: None for k in ss.prev_action_state}
-            ss.selected_action = None
-            ss.selected_context = None
-            st.rerun()
+    # ── 本分結果 ─────────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown(
+        "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;'>",
+        unsafe_allow_html=True,
+    )
+    res_cols = st.columns(4)
+    _result_btns = [
+        ("✓ 我方得分", "win", "最後觸球加成", "#1a3a1a", "#3ecf6a"),
+        ("＋ 對方失誤", "oppError", "不加成球員", "#1a2a1a", "#3ecf6a"),
+        ("✗ 我方失分", "lose", "最後觸球扣分", "#3a0e0e", "#e84343"),
+        ("○ 對手好球", "opponent", "不扣分", "#2a1e0a", "#f5a623"),
+    ]
+    for col, (label, ptype, sub, bg, border) in zip(res_cols, _result_btns):
+        with col:
+            st.markdown(
+                f"<div style='background:{bg};border:2px solid {border};"
+                f"border-radius:10px;padding:10px 8px 6px;text-align:center;"
+                f"margin-bottom:-52px;pointer-events:none;'>"
+                f"<div style='font-size:14px;font-weight:800;color:{border};'>{label}</div>"
+                f"<div style='font-size:11px;color:#7a849e;margin-top:2px;'>{sub}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            if st.button("　", key=f"res_{ptype}", use_container_width=True):
+                resolve_point(ptype); st.rerun()
 
-    # ── 本局紀錄 ──────────────────────────────────────────────────────────────
-    st.divider()
-    st.markdown("**📜 本局紀錄**")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _tab_log():
+    """完整紀錄 tab"""
+    ss = st.session_state
     cur_logs = [l for l in ss.logs if l.get("setNo", 1) == ss.current_set]
 
     if not cur_logs:
         st.caption("本局尚無紀錄")
-    else:
-        def score_badge(v):
-            color = gl.score_color_hex(v)
-            return f"<span style='color:{color};font-weight:bold;'>{v:+}</span>"
+        return
 
+    def score_badge(v):
+        color = gl.score_color_hex(v)
+        return f"<span style='color:{color};font-weight:bold;'>{v:+}</span>"
+
+    with st.container(border=True):
         for l in cur_logs:
             if l["type"] == "divider":
                 winner_color = "#3ecf6a" if l["winner"] == "us" else "#e84343"
                 st.markdown(
                     f"<div style='text-align:center;padding:6px 0;border-top:1px dashed #252b3b;'>"
-                    f"<span style='background:{winner_color};color:#000;padding:3px 12px;border-radius:10px;font-size:12px;font-weight:bold;'>"
+                    f"<span style='background:{winner_color};color:#000;padding:3px 12px;"
+                    f"border-radius:10px;font-size:12px;font-weight:bold;'>"
                     f"第{l.get('setNo',1)}局 ｜ {l['result']}"
                     f"</span></div>",
                     unsafe_allow_html=True,
@@ -839,9 +890,11 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
                 p_name = next((p["name"] for p in ss.players if p["id"] == l["playerId"]), "未知")
                 ctx = l.get("context", "一般")
                 display = ctx if ctx != "一般" else l["action"]
-                note = f" <small style='color:#7a849e;'>{l['note']}</small>" if l.get("note") else ""
+                note = (f" <small style='color:#7a849e;'>{l['note']}</small>"
+                        if l.get("note") else "")
                 st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1b1f2e;font-size:13px;'>"
+                    f"<div style='display:flex;justify-content:space-between;"
+                    f"padding:6px 0;border-bottom:1px solid #1b1f2e;font-size:13px;'>"
                     f"<span><b>{p_name}</b>：{display} ({l['quality']}) {note}</span>"
                     f"{score_badge(round(l['scoreDelta']))}"
                     f"</div>",
@@ -849,13 +902,341 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
                 )
 
 
+def _compute_action_breakdown(pid, action_logs):
+    p_logs = [l for l in action_logs if l.get("playerId") == pid]
+    if not p_logs:
+        return ""
+    counts = {}
+    for l in p_logs:
+        counts[l["action"]] = counts.get(l["action"], 0) + 1
+    total = len(p_logs)
+    parts = [f"{a} {round(c/total*100)}%"
+             for a, c in sorted(counts.items(), key=lambda x: -x[1])]
+    return " / ".join(parts[:3])
+
+
+def _tab_score():
+    """評分 tab"""
+    ss = st.session_state
+    logs = [l for l in ss.logs if l.get("type") == "action"]
+    if ss.view_set is not None:
+        logs = [l for l in logs if l.get("setNo", 1) == ss.view_set]
+
+    if not logs:
+        st.info("本局尚無動作紀錄")
+        return
+
+    player_stats = gl.compute_player_stats(ss.players, logs)
+    n_cols = min(len(player_stats), 3)
+    cols = st.columns(n_cols)
+
+    for i, ps in enumerate(player_stats):
+        with cols[i % n_cols]:
+            with st.container(border=True):
+                ovr_color = gl.score_color_hex(ps["ovr"])
+                breakdown = _compute_action_breakdown(ps["id"], logs)
+
+                # 橫向 OVR 數字 + 名稱
+                st.markdown(
+                    f"<div style='display:flex;align-items:flex-start;gap:14px;margin-bottom:10px;'>"
+                    f"<div style='font-size:52px;font-weight:900;color:{ovr_color};"
+                    f"line-height:1;min-width:60px;'>{ps['ovr']}</div>"
+                    f"<div style='padding-top:4px;'>"
+                    f"<div style='font-size:17px;font-weight:800;'>{ps['name']}</div>"
+                    f"<div style='font-size:12px;color:#7a849e;margin-top:1px;'>{ps['pos']}</div>"
+                    f"<div style='font-size:11px;color:#7a849e;margin-top:3px;'>{breakdown}</div>"
+                    f"</div></div>",
+                    unsafe_allow_html=True,
+                )
+
+                # 屬性列 + 進度條
+                for attr, val in ps["stats"].items():
+                    attr_name = gl.ATTR_TO_CHINESE.get(attr, attr)
+                    bar_color = gl.score_color_hex(val)
+                    pct = max(0, min(100, val))
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;gap:8px;margin:5px 0;'>"
+                        f"<span style='width:36px;font-size:12px;color:#8a94a8;"
+                        f"text-align:right;flex-shrink:0;'>{attr_name}</span>"
+                        f"<div style='flex:1;background:#1e2638;border-radius:4px;height:7px;'>"
+                        f"<div style='width:{pct}%;background:{bar_color};"
+                        f"border-radius:4px;height:7px;'></div></div>"
+                        f"<span style='width:28px;font-size:13px;font-weight:800;"
+                        f"color:{bar_color};text-align:right;flex-shrink:0;'>{val}</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+
+def _tab_detail():
+    """詳情 tab"""
+    import pandas as pd
+    ss = st.session_state
+    logs = [l for l in ss.logs if l.get("type") == "action"]
+    if ss.view_set is not None:
+        logs = [l for l in logs if l.get("setNo", 1) == ss.view_set]
+
+    if not logs:
+        st.info("本局尚無動作紀錄")
+        return
+
+    player_stats = gl.compute_player_stats(ss.players, logs)
+    _POS_COLORS = {
+        "大砲": "#f5a623", "副攻": "#9b59b6", "背": "#e07a5f",
+        "攔中": "#4a9eff", "舉球": "#4a9eff", "自由": "#3ecf6a",
+    }
+
+    for ps in player_stats:
+        p_logs = [l for l in logs if l.get("playerId") == ps["id"]]
+        if not p_logs:
+            continue
+
+        pos_color = _POS_COLORS.get(ps["pos"], "#7a849e")
+
+        # 標題列
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:10px;margin:16px 0 6px;'>"
+            f"<span style='background:{pos_color};color:#000;padding:2px 10px;"
+            f"border-radius:6px;font-size:12px;font-weight:800;'>{ps['pos']}</span>"
+            f"<span style='font-size:17px;font-weight:800;'>{ps['name']}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.container(border=True):
+            # Header row
+            hcols = st.columns([2.2, 2, 1, 1, 1, 1, 1, 1.8])
+            labels = ["動作", "細項"] + gl.Q_KEYS + ["均分"]
+            for col, lbl in zip(hcols, labels):
+                col.markdown(f"<div style='color:#5a6480;font-size:11px;"
+                             f"text-align:center;padding-bottom:4px;'>{lbl}</div>",
+                             unsafe_allow_html=True)
+
+            # Data rows
+            groups: dict[str, list] = {}
+            for l in p_logs:
+                key = l["action"] + "|" + l.get("context", "一般")
+                groups.setdefault(key, []).append(l)
+
+            for key, arr in groups.items():
+                action, ctx = key.split("|", 1)
+                counts = {q: sum(1 for l in arr if l.get("quality") == q) for q in gl.Q_KEYS}
+                avg = gl.safe_avg([l["scoreDelta"] for l in arr])
+                avg_color = gl.score_color_hex(avg)
+
+                st.markdown("<div style='border-top:1px solid #1a2035;'></div>",
+                            unsafe_allow_html=True)
+                rcols = st.columns([2.2, 2, 1, 1, 1, 1, 1, 1.8])
+                rcols[0].markdown(f"<div style='font-size:13px;padding:3px 0;'>{action}</div>",
+                                  unsafe_allow_html=True)
+                rcols[1].markdown(f"<div style='font-size:12px;color:#7a849e;padding:3px 0;'>{ctx}</div>",
+                                  unsafe_allow_html=True)
+                for j, q in enumerate(gl.Q_KEYS):
+                    v = counts.get(q, 0)
+                    c_str = "#c8d2e8" if v else "#2a3450"
+                    rcols[2 + j].markdown(
+                        f"<div style='text-align:center;font-size:13px;color:{c_str};'>{v}</div>",
+                        unsafe_allow_html=True,
+                    )
+                rcols[7].markdown(
+                    f"<div style='text-align:right;font-size:13px;font-weight:800;"
+                    f"color:{avg_color};padding-right:4px;'>{avg}</div>",
+                    unsafe_allow_html=True,
+                )
+
+
+def _tab_visual():
+    """視覺分析 tab"""
+    ss = st.session_state
+    logs = [l for l in ss.logs if l.get("type") == "action"]
+    if ss.view_set is not None:
+        logs = [l for l in logs if l.get("setNo", 1) == ss.view_set]
+
+    if not logs:
+        st.info("本局尚無動作紀錄")
+        return
+
+    attackers = [p for p in ss.players if gl.is_attacker(p)]
+    setters = [p for p in ss.players if p.get("pos") == "舉球"]
+
+    # ── 攻擊手：策略分佈 ──────────────────────────────────────────────────────
+    st.subheader("🔥 攻擊手：策略分佈")
+    if attackers:
+        atk_cols = st.columns(min(len(attackers), 3))
+        for i, p in enumerate(attackers):
+            arr = [l for l in logs if l.get("playerId") == p["id"] and l.get("action") == "攻擊"]
+            groups: dict[str, list] = {}
+            for l in arr:
+                groups.setdefault(l.get("context", ""), []).append(l)
+            with atk_cols[i % len(atk_cols)]:
+                with st.container(border=True):
+                    st.markdown(
+                        f"**{p['name']}** <span style='color:#7a849e;font-size:12px;'>"
+                        f"({p['pos']}) {len(arr)} 次</span>",
+                        unsafe_allow_html=True,
+                    )
+                    if arr:
+                        pie_col, bar_col = st.columns([1, 1])
+                        with pie_col:
+                            st.caption("策略頻率")
+                            st.plotly_chart(_fig_donut(groups, len(arr)),
+                                            use_container_width=True,
+                                            config={"displayModeBar": False})
+                        with bar_col:
+                            st.caption("各策略評分")
+                            fig_bar = _fig_score_bar(groups)
+                            if fig_bar:
+                                st.plotly_chart(fig_bar, use_container_width=True,
+                                               config={"displayModeBar": False})
+                    else:
+                        st.caption("無攻擊數據")
+    else:
+        st.caption("尚無攻擊手數據")
+
+    st.markdown("---")
+
+    # ── 舉球員熱力圖 ──────────────────────────────────────────────────────────
+    st.subheader("🧠 舉球員：配球效益 & 品質熱力圖")
+    T_COLORS = ["#4a9eff", "#f5a623", "#3ecf6a", "#e84343", "#9b59b6", "#e07a5f"]
+    if setters:
+        for s_p in setters:
+            sets_arr = [l for l in logs if l.get("playerId") == s_p["id"] and l.get("action") == "舉球"]
+            atk_after = [l for l in logs if l.get("action") == "攻擊" and l.get("prevPlayerId") == s_p["id"]]
+            by_target: dict = {}
+            for l in atk_after:
+                by_target.setdefault(l.get("playerId"), []).append(l)
+            total_sets = len(atk_after)
+            avg_set = gl.safe_avg([l["scoreDelta"] for l in sets_arr])
+
+            with st.container(border=True):
+                h1, h2 = st.columns([3, 1])
+                h1.markdown(f"**{s_p['name']}**")
+                h2.markdown(
+                    f"<div style='text-align:right;color:#7a849e;font-size:12px;'>"
+                    f"舉球均分 <b style='color:{gl.score_color_hex(avg_set)};'>"
+                    f"{avg_set if sets_arr else '—'}</b> / {len(sets_arr)} 次</div>",
+                    unsafe_allow_html=True,
+                )
+
+                if total_sets > 0:
+                    atk_list = [p for p in ss.players if gl.is_attacker(p)]
+                    strip = "<div style='display:flex;height:22px;border-radius:8px;overflow:hidden;margin:8px 0;'>"
+                    for ti, t in enumerate(atk_list):
+                        a = by_target.get(t["id"], [])
+                        pct = len(a) / total_sets * 100
+                        if pct > 0:
+                            col = T_COLORS[ti % len(T_COLORS)]
+                            strip += (
+                                f"<div style='width:{pct:.1f}%;background:{col};"
+                                f"display:flex;align-items:center;justify-content:center;"
+                                f"font-size:10px;font-weight:900;color:#000;overflow:hidden;'>"
+                                f"{'&nbsp;' + t['name'] if pct >= 10 else ''}</div>"
+                            )
+                    strip += "</div>"
+                    st.markdown(strip, unsafe_allow_html=True)
+
+                    for ti, t in enumerate(atk_list):
+                        a = by_target.get(t["id"], [])
+                        pct = round(len(a) / total_sets * 100) if total_sets else 0
+                        sc = gl.safe_avg([l["scoreDelta"] for l in a])
+                        col = T_COLORS[ti % len(T_COLORS)]
+                        rc1, rc2, rc3 = st.columns([3, 1, 1])
+                        rc1.markdown(
+                            f"<span style='color:{col};font-size:14px;'>●</span> **{t['name']}** "
+                            f"<span style='color:#7a849e;font-size:11px;'>{t['pos']}</span>",
+                            unsafe_allow_html=True,
+                        )
+                        rc2.markdown(f"<div style='text-align:center;font-size:12px;'>"
+                                     f"{len(a)}球 / {pct}%</div>", unsafe_allow_html=True)
+                        rc3.markdown(
+                            f"<div style='text-align:center;font-weight:900;"
+                            f"color:{gl.score_color_hex(sc)};'>{sc if a else '—'}</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                st.markdown("**舉球品質熱力圖**　"
+                            "<span style='color:#7a849e;font-size:11px;'>行＝舉球品質 / 列＝一傳品質</span>",
+                            unsafe_allow_html=True)
+                heatmap: dict[str, int] = {f"{pq}|{sq}": 0 for pq in gl.Q_KEYS for sq in gl.Q_KEYS}
+                for l in sets_arr:
+                    pq = l.get("prevQuality")
+                    if pq:
+                        heatmap[f"{pq}|{l['quality']}"] = heatmap.get(f"{pq}|{l['quality']}", 0) + 1
+                st.plotly_chart(_fig_setter_heatmap(heatmap),
+                                use_container_width=True, config={"displayModeBar": False})
+    else:
+        st.caption("尚無舉球員")
+
+    st.markdown("---")
+
+    # ── 團隊防守 ──────────────────────────────────────────────────────────────
+    st.subheader("🛡 團隊防守")
+    def_ctxs = ["接發", "接扣", "一般防守", "吊球/Cover", "接嗆司"]
+    def_data = []
+    for ctx in def_ctxs:
+        if ctx == "接發":
+            arr = [l for l in logs if l.get("action") == "接發"]
+        elif ctx == "接扣":
+            arr = [l for l in logs if l.get("action") == "接扣"]
+        else:
+            arr = [l for l in logs if l.get("action") == "防守" and l.get("context") == ctx]
+        def_data.append({
+            "ctx": ctx, "arr": arr,
+            "score": gl.safe_avg([l["scoreDelta"] for l in arr]) if arr else 0,
+        })
+
+    dc1, dc2 = st.columns([1, 1])
+    with dc1:
+        fig_def = _fig_defense_radar(def_data)
+        if fig_def:
+            st.plotly_chart(fig_def, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.caption("需要 3 項以上防守數據才能顯示雷達圖")
+    with dc2:
+        for d in def_data:
+            sc = d["score"]
+            dn1, dn2 = st.columns([3, 1])
+            dn1.markdown(
+                f"**{d['ctx']}** <span style='color:#7a849e;font-size:11px;'>({len(d['arr'])} 次)</span>",
+                unsafe_allow_html=True,
+            )
+            dn2.markdown(
+                f"<b style='color:{gl.score_color_hex(sc)};'>{sc if d['arr'] else '—'}</b>",
+                unsafe_allow_html=True,
+            )
+            if d["arr"]:
+                st.progress(sc / 100)
+
+
+def page_record():
+    ss = st.session_state
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+
+    # Header
+    _render_match_header()
+
+    # Set selector
+    _render_set_selector()
+
+    st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
+
+    # 主 Tab 區
+    tabs = st.tabs(["名單", "智慧快記", "完整紀錄", "評分", "詳情", "視覺分析"])
+    with tabs[0]: _tab_roster()
+    with tabs[1]: _tab_record()
+    with tabs[2]: _tab_log()
+    with tabs[3]: _tab_score()
+    with tabs[4]: _tab_detail()
+    with tabs[5]: _tab_visual()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# ── 分析 & PDF 匯出 ───────────────────────────────────────────────────────────
+# 多場次分析頁（從比賽列表進入）
 # ══════════════════════════════════════════════════════════════════════════════
 
 def page_analysis():
     import pandas as pd
-
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     ss = st.session_state
 
     if not ss.selected_match_ids:
@@ -864,7 +1245,6 @@ def page_analysis():
             go("matches")
         return
 
-    # ── 取比賽名稱 & 合併資料 ────────────────────────────────────────────────
     match_titles = []
     for mid in ss.selected_match_ids:
         m = storage.get_match(mid)
@@ -889,7 +1269,7 @@ def page_analysis():
 
     st.divider()
 
-    # ── 局數篩選 ─────────────────────────────────────────────────────────────
+    # 局數篩選
     st.markdown("**🔍 局數篩選**")
     vs = ss.view_set
     fc1, fc2, fc3, fc4 = st.columns(4)
@@ -901,7 +1281,6 @@ def page_analysis():
 
     st.divider()
 
-    # ── 合併資料 & 依局數篩選 ────────────────────────────────────────────────
     players, logs_all = merge_matches_for_analysis(ss.selected_match_ids)
     logs = logs_all if ss.view_set is None else [l for l in logs_all if l.get("setNo", 1) == ss.view_set]
     action_logs = [l for l in logs if l.get("type") == "action"]
@@ -911,14 +1290,8 @@ def page_analysis():
         st.info("選中的比賽（該局）尚無動作紀錄。")
         return
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 頁籤
-    # ══════════════════════════════════════════════════════════════════════════
     tab_score, tab_detail, tab_visual = st.tabs(["🏅 評分", "📋 詳情", "📈 視覺分析"])
 
-    # ────────────────────────────────────────────────────────────────────────
-    # 評分 tab — OVR + 雷達圖
-    # ────────────────────────────────────────────────────────────────────────
     with tab_score:
         n_cols = min(len(player_stats), 3)
         cols = st.columns(n_cols)
@@ -926,70 +1299,95 @@ def page_analysis():
             with cols[i % n_cols]:
                 with st.container(border=True):
                     ovr_color = gl.score_color_hex(ps["ovr"])
+                    breakdown = _compute_action_breakdown(ps["id"], action_logs)
                     st.markdown(
-                        f"<div style='text-align:center;'>"
-                        f"<div style='font-size:46px;font-weight:900;color:{ovr_color};line-height:1;'>{ps['ovr']}</div>"
-                        f"<div style='font-size:16px;font-weight:bold;margin-top:4px;'>{ps['name']}</div>"
-                        f"<div style='color:#7a849e;font-size:12px;'>{ps['pos']}</div>"
-                        f"</div>",
+                        f"<div style='display:flex;align-items:flex-start;gap:14px;margin-bottom:10px;'>"
+                        f"<div style='font-size:52px;font-weight:900;color:{ovr_color};"
+                        f"line-height:1;min-width:60px;'>{ps['ovr']}</div>"
+                        f"<div style='padding-top:4px;'>"
+                        f"<div style='font-size:17px;font-weight:800;'>{ps['name']}</div>"
+                        f"<div style='font-size:12px;color:#7a849e;'>{ps['pos']}</div>"
+                        f"<div style='font-size:11px;color:#7a849e;margin-top:2px;'>{breakdown}</div>"
+                        f"</div></div>",
                         unsafe_allow_html=True,
                     )
-                    fig = _fig_radar(ps["stats"], color=ovr_color)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                    else:
-                        st.caption("需要 3 項以上數據才能顯示雷達圖")
-                    # 屬性數值列表
                     for attr, val in ps["stats"].items():
-                        c_name, c_val = st.columns([3, 1])
-                        c_name.caption(gl.ATTR_TO_CHINESE.get(attr, attr))
-                        c_val.markdown(f"<b style='color:{gl.score_color_hex(val)};'>{val}</b>",
-                                       unsafe_allow_html=True)
+                        attr_name = gl.ATTR_TO_CHINESE.get(attr, attr)
+                        bar_color = gl.score_color_hex(val)
+                        pct = max(0, min(100, val))
+                        st.markdown(
+                            f"<div style='display:flex;align-items:center;gap:8px;margin:5px 0;'>"
+                            f"<span style='width:36px;font-size:12px;color:#8a94a8;"
+                            f"text-align:right;flex-shrink:0;'>{attr_name}</span>"
+                            f"<div style='flex:1;background:#1e2638;border-radius:4px;height:7px;'>"
+                            f"<div style='width:{pct}%;background:{bar_color};"
+                            f"border-radius:4px;height:7px;'></div></div>"
+                            f"<span style='width:28px;font-size:13px;font-weight:800;"
+                            f"color:{bar_color};text-align:right;flex-shrink:0;'>{val}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
 
-    # ────────────────────────────────────────────────────────────────────────
-    # 詳情 tab — 屬性總表 + 動作明細
-    # ────────────────────────────────────────────────────────────────────────
     with tab_detail:
-        attr_keys = ["ATK", "REC", "DEF", "BLK", "SET", "SRV"]
-        tbl = {"球員": [], "位置": [], "OVR": []}
-        for a in attr_keys:
-            tbl[gl.ATTR_TO_CHINESE[a]] = []
-        for ps in player_stats:
-            tbl["球員"].append(ps["name"]); tbl["位置"].append(ps["pos"]); tbl["OVR"].append(ps["ovr"])
-            for a in attr_keys:
-                tbl[gl.ATTR_TO_CHINESE[a]].append(ps["stats"].get(a, "—"))
-        st.dataframe(pd.DataFrame(tbl), use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        st.subheader("📋 動作明細")
+        _POS_COLORS = {
+            "大砲": "#f5a623", "副攻": "#9b59b6", "背": "#e07a5f",
+            "攔中": "#4a9eff", "舉球": "#4a9eff", "自由": "#3ecf6a",
+        }
         for ps in player_stats:
             p_logs = [l for l in action_logs if l.get("playerId") == ps["id"]]
             if not p_logs:
                 continue
-            with st.expander(f"{ps['pos']} · {ps['name']}　（{len(p_logs)} 筆）"):
+            pos_color = _POS_COLORS.get(ps["pos"], "#7a849e")
+            st.markdown(
+                f"<div style='display:flex;align-items:center;gap:10px;margin:16px 0 6px;'>"
+                f"<span style='background:{pos_color};color:#000;padding:2px 10px;"
+                f"border-radius:6px;font-size:12px;font-weight:800;'>{ps['pos']}</span>"
+                f"<span style='font-size:17px;font-weight:800;'>{ps['name']}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            with st.container(border=True):
+                hcols = st.columns([2.2, 2, 1, 1, 1, 1, 1, 1.8])
+                for col, lbl in zip(hcols, ["動作", "細項"] + gl.Q_KEYS + ["均分"]):
+                    col.markdown(
+                        f"<div style='color:#5a6480;font-size:11px;text-align:center;"
+                        f"padding-bottom:4px;'>{lbl}</div>",
+                        unsafe_allow_html=True,
+                    )
                 groups: dict[str, list] = {}
                 for l in p_logs:
                     key = l["action"] + "|" + l.get("context", "一般")
                     groups.setdefault(key, []).append(l)
-                rows = []
                 for key, arr in groups.items():
                     action, ctx = key.split("|", 1)
                     counts = {q: sum(1 for l in arr if l.get("quality") == q) for q in gl.Q_KEYS}
-                    rows.append({
-                        "動作": action, "細項": ctx,
-                        **{f"{q}({gl.QUALITY_LABELS[q]})": counts.get(q, 0) for q in gl.Q_KEYS},
-                        "均分": gl.safe_avg([l["scoreDelta"] for l in arr]),
-                    })
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    avg = gl.safe_avg([l["scoreDelta"] for l in arr])
+                    avg_color = gl.score_color_hex(avg)
+                    st.markdown("<div style='border-top:1px solid #1a2035;'></div>",
+                                unsafe_allow_html=True)
+                    rcols = st.columns([2.2, 2, 1, 1, 1, 1, 1, 1.8])
+                    rcols[0].markdown(f"<div style='font-size:13px;padding:3px 0;'>{action}</div>",
+                                      unsafe_allow_html=True)
+                    rcols[1].markdown(f"<div style='font-size:12px;color:#7a849e;'>{ctx}</div>",
+                                      unsafe_allow_html=True)
+                    for j, q in enumerate(gl.Q_KEYS):
+                        v = counts.get(q, 0)
+                        c_str = "#c8d2e8" if v else "#2a3450"
+                        rcols[2+j].markdown(
+                            f"<div style='text-align:center;font-size:13px;color:{c_str};'>{v}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    rcols[7].markdown(
+                        f"<div style='text-align:right;font-size:13px;font-weight:800;"
+                        f"color:{avg_color};'>{avg}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-    # ────────────────────────────────────────────────────────────────────────
-    # 視覺分析 tab
-    # ────────────────────────────────────────────────────────────────────────
     with tab_visual:
+        # 重用 _tab_visual 的邏輯但使用 action_logs + players
         attackers = [p for p in players if gl.is_attacker(p)]
-        setters   = [p for p in players if p.get("pos") == "舉球"]
+        setters = [p for p in players if p.get("pos") == "舉球"]
 
-        # ── 攻擊手：策略圓餅圖 ────────────────────────────────────────────
         st.subheader("🔥 攻擊手：策略分佈")
         if attackers:
             atk_cols = st.columns(min(len(attackers), 3))
@@ -1000,8 +1398,8 @@ def page_analysis():
                     groups.setdefault(l.get("context", ""), []).append(l)
                 with atk_cols[i % len(atk_cols)]:
                     with st.container(border=True):
-                        st.markdown(f"**{p['name']}** <span style='color:#7a849e;font-size:12px;'>({p['pos']}) {len(arr)} 次</span>",
-                                    unsafe_allow_html=True)
+                        st.markdown(f"**{p['name']}** <span style='color:#7a849e;font-size:12px;'>"
+                                    f"({p['pos']}) {len(arr)} 次</span>", unsafe_allow_html=True)
                         if arr:
                             pie_col, bar_col = st.columns([1, 1])
                             with pie_col:
@@ -1013,23 +1411,21 @@ def page_analysis():
                                 fig_bar = _fig_score_bar(groups)
                                 if fig_bar:
                                     st.plotly_chart(fig_bar, use_container_width=True,
-                                                    config={"displayModeBar": False})
-                                else:
-                                    st.caption("無評分數據")
+                                                   config={"displayModeBar": False})
                         else:
                             st.caption("無攻擊數據")
         else:
             st.caption("尚無攻擊手數據")
 
         st.markdown("---")
-
-        # ── 舉球員：配球分佈 + 熱力圖 ─────────────────────────────────────
         st.subheader("🧠 舉球員：配球效益 & 品質熱力圖")
         T_COLORS = ["#4a9eff", "#f5a623", "#3ecf6a", "#e84343", "#9b59b6", "#e07a5f"]
         if setters:
             for s_p in setters:
-                sets_arr = [l for l in action_logs if l.get("playerId") == s_p["id"] and l.get("action") == "舉球"]
-                atk_after = [l for l in action_logs if l.get("action") == "攻擊" and l.get("prevPlayerId") == s_p["id"]]
+                sets_arr = [l for l in action_logs
+                            if l.get("playerId") == s_p["id"] and l.get("action") == "舉球"]
+                atk_after = [l for l in action_logs
+                             if l.get("action") == "攻擊" and l.get("prevPlayerId") == s_p["id"]]
                 by_target: dict = {}
                 for l in atk_after:
                     by_target.setdefault(l.get("playerId"), []).append(l)
@@ -1039,11 +1435,12 @@ def page_analysis():
                 with st.container(border=True):
                     h1, h2 = st.columns([3, 1])
                     h1.markdown(f"**{s_p['name']}**")
-                    h2.markdown(f"<div style='text-align:right;color:#7a849e;font-size:12px;'>舉球均分 "
-                                f"<b style='color:{gl.score_color_hex(avg_set)};'>{avg_set if sets_arr else '—'}</b>"
-                                f" / {len(sets_arr)} 次</div>", unsafe_allow_html=True)
-
-                    # 配球比例色條
+                    h2.markdown(
+                        f"<div style='text-align:right;color:#7a849e;font-size:12px;'>"
+                        f"舉球均分 <b style='color:{gl.score_color_hex(avg_set)};'>"
+                        f"{avg_set if sets_arr else '—'}</b> / {len(sets_arr)} 次</div>",
+                        unsafe_allow_html=True,
+                    )
                     if total_sets > 0:
                         atk_list = [p for p in players if gl.is_attacker(p)]
                         strip = "<div style='display:flex;height:22px;border-radius:8px;overflow:hidden;margin:8px 0;'>"
@@ -1052,32 +1449,14 @@ def page_analysis():
                             pct = len(a) / total_sets * 100
                             if pct > 0:
                                 col = T_COLORS[ti % len(T_COLORS)]
-                                strip += (f"<div style='width:{pct:.1f}%;background:{col};display:flex;"
-                                          f"align-items:center;justify-content:center;font-size:10px;"
-                                          f"font-weight:900;color:#000;overflow:hidden;'>"
-                                          f"{'&nbsp;'+t['name'] if pct >= 10 else ''}</div>")
+                                strip += (
+                                    f"<div style='width:{pct:.1f}%;background:{col};"
+                                    f"display:flex;align-items:center;justify-content:center;"
+                                    f"font-size:10px;font-weight:900;color:#000;overflow:hidden;'>"
+                                    f"{'&nbsp;'+t['name'] if pct >= 10 else ''}</div>"
+                                )
                         strip += "</div>"
                         st.markdown(strip, unsafe_allow_html=True)
-
-                        # 各攻擊手詳細列
-                        for ti, t in enumerate(atk_list):
-                            a = by_target.get(t["id"], [])
-                            pct = round(len(a) / total_sets * 100) if total_sets else 0
-                            sc  = gl.safe_avg([l["scoreDelta"] for l in a])
-                            col = T_COLORS[ti % len(T_COLORS)]
-                            rc1, rc2, rc3 = st.columns([3, 1, 1])
-                            rc1.markdown(f"<span style='color:{col};font-size:14px;'>●</span> **{t['name']}** "
-                                         f"<span style='color:#7a849e;font-size:11px;'>{t['pos']}</span>",
-                                         unsafe_allow_html=True)
-                            rc2.markdown(f"<div style='text-align:center;font-size:12px;'>{len(a)}球 / {pct}%</div>",
-                                         unsafe_allow_html=True)
-                            rc3.markdown(f"<div style='text-align:center;font-weight:900;"
-                                         f"color:{gl.score_color_hex(sc)};'>{sc if a else '—'}</div>",
-                                         unsafe_allow_html=True)
-
-                    # 熱力圖
-                    st.markdown("**舉球品質熱力圖**　<span style='color:#7a849e;font-size:11px;'>行＝舉球品質 / 列＝一傳品質</span>",
-                                unsafe_allow_html=True)
                     heatmap: dict[str, int] = {f"{pq}|{sq}": 0 for pq in gl.Q_KEYS for sq in gl.Q_KEYS}
                     for l in sets_arr:
                         pq = l.get("prevQuality")
@@ -1085,12 +1464,8 @@ def page_analysis():
                             heatmap[f"{pq}|{l['quality']}"] = heatmap.get(f"{pq}|{l['quality']}", 0) + 1
                     st.plotly_chart(_fig_setter_heatmap(heatmap),
                                     use_container_width=True, config={"displayModeBar": False})
-        else:
-            st.caption("尚無舉球員")
 
         st.markdown("---")
-
-        # ── 團隊防守：雷達 + 數值列 ────────────────────────────────────────
         st.subheader("🛡 團隊防守")
         def_ctxs = ["接發", "接扣", "一般防守", "吊球/Cover", "接嗆司"]
         def_data = []
@@ -1101,8 +1476,10 @@ def page_analysis():
                 arr = [l for l in action_logs if l.get("action") == "接扣"]
             else:
                 arr = [l for l in action_logs if l.get("action") == "防守" and l.get("context") == ctx]
-            def_data.append({"ctx": ctx, "arr": arr, "score": gl.safe_avg([l["scoreDelta"] for l in arr]) if arr else 0})
-
+            def_data.append({
+                "ctx": ctx, "arr": arr,
+                "score": gl.safe_avg([l["scoreDelta"] for l in arr]) if arr else 0,
+            })
         dc1, dc2 = st.columns([1, 1])
         with dc1:
             fig_def = _fig_defense_radar(def_data)
@@ -1114,10 +1491,14 @@ def page_analysis():
             for d in def_data:
                 sc = d["score"]
                 dn1, dn2 = st.columns([3, 1])
-                dn1.markdown(f"**{d['ctx']}** <span style='color:#7a849e;font-size:11px;'>({len(d['arr'])} 次)</span>",
-                             unsafe_allow_html=True)
-                dn2.markdown(f"<b style='color:{gl.score_color_hex(sc)};'>{sc if d['arr'] else '—'}</b>",
-                             unsafe_allow_html=True)
+                dn1.markdown(
+                    f"**{d['ctx']}** <span style='color:#7a849e;font-size:11px;'>({len(d['arr'])} 次)</span>",
+                    unsafe_allow_html=True,
+                )
+                dn2.markdown(
+                    f"<b style='color:{gl.score_color_hex(sc)};'>{sc if d['arr'] else '—'}</b>",
+                    unsafe_allow_html=True,
+                )
                 if d["arr"]:
                     st.progress(sc / 100)
 
@@ -1128,8 +1509,6 @@ def page_analysis():
 
 def main():
     page = st.session_state.page
-
-    # 未登入時強制回首頁
     if page != "home" and not st.session_state.user_code:
         st.session_state.page = "home"
         page = "home"
