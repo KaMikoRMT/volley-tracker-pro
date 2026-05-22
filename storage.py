@@ -112,6 +112,7 @@ def user_exists(code: str) -> bool:
 
 def create_user() -> str:
     now = datetime.now().isoformat()
+    last_exc: Exception | None = None
     for _ in range(30):
         code = _gen_code()
         try:
@@ -124,9 +125,10 @@ def create_user() -> str:
                 db.commit()
                 db.close()
                 return code
-        except Exception:
+        except Exception as e:
+            last_exc = e
             continue
-    raise RuntimeError("無法產生唯一代碼，請稍後再試")
+    raise RuntimeError(f"無法產生唯一代碼，請稍後再試。原因：{last_exc}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
