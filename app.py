@@ -1526,7 +1526,7 @@ def page_analysis():
                     unsafe_allow_html=True,
                 )
                 if d["arr"]:
-                    st.progress(sc / 100)
+                    st.progress(max(0.0, min(1.0, sc / 100)))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
