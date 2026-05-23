@@ -1108,12 +1108,14 @@ def _tab_visual():
                             st.caption("策略頻率")
                             st.plotly_chart(_fig_donut(groups, len(arr)),
                                             use_container_width=True,
+                                            key=f"donut_{p['id']}",
                                             config={"displayModeBar": False})
                         with bar_col:
                             st.caption("各策略評分")
                             fig_bar = _fig_score_bar(groups)
                             if fig_bar:
                                 st.plotly_chart(fig_bar, use_container_width=True,
+                                               key=f"bar_{p['id']}",
                                                config={"displayModeBar": False})
                     else:
                         st.caption("無攻擊數據")
@@ -1190,7 +1192,9 @@ def _tab_visual():
                     if pq:
                         heatmap[f"{pq}|{l['quality']}"] = heatmap.get(f"{pq}|{l['quality']}", 0) + 1
                 st.plotly_chart(_fig_setter_heatmap(heatmap),
-                                use_container_width=True, config={"displayModeBar": False})
+                                use_container_width=True,
+                                key=f"heatmap_{s_p['id']}",
+                                config={"displayModeBar": False})
     else:
         st.caption("尚無舉球員")
 
@@ -1216,7 +1220,9 @@ def _tab_visual():
     with dc1:
         fig_def = _fig_defense_radar(def_data)
         if fig_def:
-            st.plotly_chart(fig_def, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_def, use_container_width=True,
+                            key="defense_radar",
+                            config={"displayModeBar": False})
         else:
             st.caption("需要 3 項以上防守數據才能顯示雷達圖")
     with dc2:
@@ -1431,12 +1437,15 @@ def page_analysis():
                             with pie_col:
                                 st.caption("策略頻率")
                                 st.plotly_chart(_fig_donut(groups, len(arr)),
-                                                use_container_width=True, config={"displayModeBar": False})
+                                                use_container_width=True,
+                                                key=f"an_donut_{p['id']}",
+                                                config={"displayModeBar": False})
                             with bar_col:
                                 st.caption("各策略評分")
                                 fig_bar = _fig_score_bar(groups)
                                 if fig_bar:
                                     st.plotly_chart(fig_bar, use_container_width=True,
+                                                   key=f"an_bar_{p['id']}",
                                                    config={"displayModeBar": False})
                         else:
                             st.caption("無攻擊數據")
@@ -1489,7 +1498,9 @@ def page_analysis():
                         if pq:
                             heatmap[f"{pq}|{l['quality']}"] = heatmap.get(f"{pq}|{l['quality']}", 0) + 1
                     st.plotly_chart(_fig_setter_heatmap(heatmap),
-                                    use_container_width=True, config={"displayModeBar": False})
+                                    use_container_width=True,
+                                    key=f"an_heatmap_{s_p['id']}",
+                                    config={"displayModeBar": False})
 
         st.markdown("---")
         st.subheader("🛡 團隊防守")
@@ -1510,7 +1521,9 @@ def page_analysis():
         with dc1:
             fig_def = _fig_defense_radar(def_data)
             if fig_def:
-                st.plotly_chart(fig_def, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_def, use_container_width=True,
+                                key="an_defense_radar",
+                                config={"displayModeBar": False})
             else:
                 st.caption("需要 3 項以上防守數據才能顯示雷達圖")
         with dc2:
